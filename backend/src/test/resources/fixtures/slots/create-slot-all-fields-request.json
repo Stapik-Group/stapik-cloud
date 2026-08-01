@@ -1,0 +1,9 @@
+{
+  "slotKey": "custom-slot",
+  "contentType": "JSON",
+  "maxSizeBytes": 2097152,
+  "versioningEnabled": false,
+  "maxVersionsRetained": 5,
+  "conflictStrategy": "LAST_WRITE_WINS",
+  "encryptionRequired": true
+}

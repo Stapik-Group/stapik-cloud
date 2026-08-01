@@ -1,0 +1,13 @@
+{
+  "slots": [
+    {
+      "slotKey": "notes",
+      "contentType": "TEXT",
+      "maxSizeBytes": 1048576,
+      "versioningEnabled": true,
+      "maxVersionsRetained": 20,
+      "conflictStrategy": "LAST_WRITE_WINS",
+      "encryptionRequired": false
+    }
+  ]
+}

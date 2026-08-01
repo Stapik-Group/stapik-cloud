@@ -1,0 +1,83 @@
+server:
+  port: ${SERVER_PORT:8077}
+
+spring:
+  application:
+    name: stapik-cloud-backend
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:stapikcloud}
+    username: ${DB_USER:stapikcloud}
+    password: ${DB_PASSWORD:stapikcloud}
+
+  jpa:
+    open-in-view: false
+    show-sql: true
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        jdbc:
+          time_zone: UTC
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: false
+
+  servlet:
+    multipart:
+      max-file-size: ${ASSET_MAX_FILE_SIZE:512MB}
+      max-request-size: ${ASSET_MAX_REQUEST_SIZE:512MB}
+
+springdoc:
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    urls:
+      - name: Application API
+        url: /openapi/app-api.yaml
+      - name: Admin API
+        url: /openapi/admin-api.yaml
+
+stapik-cloud:
+  admin:
+    allowed-origins: ${ADMIN_ALLOWED_ORIGINS:http://localhost:5173}
+  security:
+    api-key-header: x-api-key
+    jwt:
+      secret: ${JWT_SECRET}
+      expiration-minutes: ${JWT_EXPIRATION_MINUTES:60}
+      issuer: stapik-cloud
+  admin-bootstrap:
+    username: ${ADMIN_BOOTSTRAP_USERNAME:}
+    password: ${ADMIN_BOOTSTRAP_PASSWORD:}
+  asset-storage:
+    root-path: ${ASSET_STORAGE_ROOT:/var/lib/stapik-cloud/assets}
+  audit:
+    retention-days: ${AUDIT_RETENTION_DAYS:365}
+
+logging:
+  level:
+    root: INFO
+    com.stapikgroup.stapikcloud: ${APP_LOG_LEVEL:INFO}
+    org.hibernate.SQL: ${SQL_LOG_LEVEL:WARN}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+logging:
+  level:
+    com.stapikgroup.stapikcloud: DEBUG
+    org.hibernate.SQL: DEBUG
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prod

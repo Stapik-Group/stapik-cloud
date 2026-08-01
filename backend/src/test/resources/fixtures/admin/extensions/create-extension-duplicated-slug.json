@@ -1,0 +1,6 @@
+{
+  "slug": "example-slug",
+  "displayName": "Second extension",
+  "iconGlyph": "icon-app",
+  "color": "#FF0000"
+}

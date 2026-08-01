@@ -1,0 +1,634 @@
+openapi: 3.0.3
+info:
+  title: Stapik Cloud - Admin API
+  version: 1.0.0
+  description: >
+    Admin panel API (React) - login, extension wizard, slot/key management, document
+    browser, audit log. Authentication: JWT (Bearer), fully separated from client
+    application auth (x-api-key in app-api).
+
+servers:
+  - url: /api/admin
+
+security:
+  - BearerAuth: []
+
+tags:
+  - name: auth
+  - name: extensions
+  - name: slots
+  - name: keys
+  - name: admin-documents
+  - name: audit-log
+
+paths:
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Log in to the admin panel, returns a JWT token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Wrong credentials
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+        '400':
+          description: Missing credentials
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+
+  /extensions:
+    get:
+      operationId: listExtensions
+      tags: [extensions]
+      summary: List extensions (dashboard)
+      responses:
+        '200':
+          description: List of extensions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExtensionListResponse'
+    post:
+      operationId: createExtension
+      tags: [extensions]
+      summary: Create a new extension (wizard step 1)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateExtensionRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExtensionResponse'
+        '400':
+          description: Missing information in request
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+        '409':
+          description: Conflict with existing exception
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+
+  /extensions/{extensionId}:
+    get:
+      operationId: getExtension
+      tags: [extensions]
+      summary: Extension details
+      parameters:
+        - $ref: '#/components/parameters/ExtensionIdParam'
+      responses:
+        '200':
+          description: Details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExtensionResponse'
+        '404':
+          description: No such extension.
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+    delete:
+      operationId: deleteExtension
+      tags: [extensions]
+      summary: Delete an extension along with its slots, keys and data
+      parameters:
+        - $ref: '#/components/parameters/ExtensionIdParam'
+      responses:
+        '204':
+          description: Deleted
+        '404':
+          description: No such extension.
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+
+  /extensions/{extensionId}/slots:
+    get:
+      operationId: listDocumentSlots
+      tags: [slots]
+      summary: List the slots of a given extension
+      parameters:
+        - $ref: '#/components/parameters/ExtensionIdParam'
+      responses:
+        '200':
+          description: List of slots
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentSlotListResponse'
+    post:
+      operationId: createDocumentSlot
+      tags: [slots]
+      summary: Add a document slot (wizard step 2)
+      parameters:
+        - $ref: '#/components/parameters/ExtensionIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDocumentSlotRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentSlotResponse'
+        '404':
+          description: Extension not found
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+
+  /extensions/{extensionId}/slots/{slotId}:
+    delete:
+      operationId: deleteDocumentSlot
+      tags: [slots]
+      summary: Delete a document slot
+      parameters:
+        - $ref: '#/components/parameters/ExtensionIdParam'
+        - $ref: '#/components/parameters/SlotIdParam'
+      responses:
+        '204':
+          description: Deleted
+        '404':
+          description: Document slot not found
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+
+  /extensions/{extensionId}/keys:
+    get:
+      operationId: listApiKeys
+      tags: [keys]
+      summary: List the extension's API keys (without the secret value)
+      parameters:
+        - $ref: '#/components/parameters/ExtensionIdParam'
+      responses:
+        '200':
+          description: List of keys
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiKeyListResponse'
+    post:
+      operationId: createApiKey
+      tags: [keys]
+      summary: Generate a new API key for a device (wizard step 3)
+      parameters:
+        - $ref: '#/components/parameters/ExtensionIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateApiKeyRequest'
+      responses:
+        '201':
+          description: >
+            Created - the plaintext key value is returned ONLY in this response and
+            is never available for retrieval again.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiKeyCreatedResponse'
+
+  /extensions/{extensionId}/keys/{keyId}:
+    delete:
+      operationId: revokeApiKey
+      tags: [keys]
+      summary: Revoke a single device's API key
+      parameters:
+        - $ref: '#/components/parameters/ExtensionIdParam'
+        - $ref: '#/components/parameters/KeyIdParam'
+      responses:
+        '204':
+          description: Revoked
+
+  /extensions/{extensionId}/documents/{slotKey}:
+    get:
+      operationId: getDocumentContent
+      tags: [admin-documents]
+      summary: Preview the current document content (document browser)
+      parameters:
+        - $ref: '#/components/parameters/ExtensionIdParam'
+        - $ref: '#/components/parameters/SlotKeyPathParam'
+      responses:
+        '200':
+          description: Document content
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminDocumentResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /extensions/{extensionId}/documents/{slotKey}/versions:
+    get:
+      operationId: listDocumentVersionsAdmin
+      tags: [admin-documents]
+      summary: Document version history
+      parameters:
+        - $ref: '#/components/parameters/ExtensionIdParam'
+        - $ref: '#/components/parameters/SlotKeyPathParam'
+      responses:
+        '200':
+          description: List of versions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminDocumentVersionListResponse'
+
+  /extensions/{extensionId}/documents/{slotKey}/versions/{versionId}/restore:
+    post:
+      operationId: restoreDocumentVersionAdmin
+      tags: [admin-documents]
+      summary: Restore the given version as current (manual recovery after a conflict)
+      parameters:
+        - $ref: '#/components/parameters/ExtensionIdParam'
+        - $ref: '#/components/parameters/SlotKeyPathParam'
+        - name: versionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Restored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminDocumentResponse'
+
+  /audit-log:
+    get:
+      operationId: listAuditLog
+      tags: [audit-log]
+      summary: Filterable list of audit events
+      parameters:
+        - name: extensionId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: Result page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditLogPageResponse'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    ExtensionIdParam:
+      name: extensionId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    SlotIdParam:
+      name: slotId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    SlotKeyPathParam:
+      name: slotKey
+      in: path
+      required: true
+      schema:
+        type: string
+    KeyIdParam:
+      name: keyId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Invalid login credentials
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+
+    LoginResponse:
+      type: object
+      required: [token, expiresAt]
+      properties:
+        token:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+
+    ContentType:
+      type: string
+      enum: [JSON, TEXT, BINARY, BINARY_COLLECTION]
+
+    ConflictStrategy:
+      type: string
+      enum: [LAST_WRITE_WINS, LAST_WRITE_WINS_WITH_SHADOW_COPY]
+
+    ApiKeyScope:
+      type: string
+      enum: [READ_ONLY, READ_WRITE]
+
+    CreateExtensionRequest:
+      type: object
+      required: [slug, displayName]
+      properties:
+        slug:
+          type: string
+        displayName:
+          type: string
+        iconGlyph:
+          type: string
+        color:
+          type: string
+
+    ExtensionResponse:
+      type: object
+      required: [id, slug, displayName, enabled, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        slug:
+          type: string
+        displayName:
+          type: string
+        iconGlyph:
+          type: string
+        color:
+          type: string
+        enabled:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    ExtensionListResponse:
+      type: object
+      properties:
+        extensions:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExtensionResponse'
+
+    CreateDocumentSlotRequest:
+      type: object
+      required: [ slotKey, contentType ]
+      properties:
+        slotKey:
+          type: string
+        contentType:
+          $ref: '#/components/schemas/ContentType'
+        maxSizeBytes:
+          type: integer
+          format: int64
+          default: 1048576
+        versioningEnabled:
+          type: boolean
+          default: true
+        maxVersionsRetained:
+          type: integer
+          default: 20
+        conflictStrategy:
+          allOf:
+            - $ref: '#/components/schemas/ConflictStrategy'
+          default: LAST_WRITE_WINS_WITH_SHADOW_COPY
+        encryptionRequired:
+          type: boolean
+          default: false
+
+    DocumentSlotResponse:
+      allOf:
+        - $ref: '#/components/schemas/CreateDocumentSlotRequest'
+        - type: object
+          required: [id]
+          properties:
+            id:
+              type: string
+              format: uuid
+
+    DocumentSlotListResponse:
+      type: object
+      properties:
+        slots:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentSlotResponse'
+
+    CreateApiKeyRequest:
+      type: object
+      required: [label, scope]
+      properties:
+        label:
+          type: string
+          example: desktop-laptop
+        scope:
+          $ref: '#/components/schemas/ApiKeyScope'
+        ipAllowlist:
+          type: string
+          nullable: true
+          example: 100.64.0.0/10
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    ApiKeyResponse:
+      type: object
+      required: [id, label, scope, revoked, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        label:
+          type: string
+        scope:
+          $ref: '#/components/schemas/ApiKeyScope'
+        ipAllowlist:
+          type: string
+          nullable: true
+        revoked:
+          type: boolean
+        lastUsedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    ApiKeyCreatedResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiKeyResponse'
+        - type: object
+          required: [rawKey]
+          properties:
+            rawKey:
+              type: string
+              description: Plaintext key value - shown exactly once, right here.
+
+    ApiKeyListResponse:
+      type: object
+      properties:
+        keys:
+          type: array
+          items:
+            $ref: '#/components/schemas/ApiKeyResponse'
+
+    AdminDocumentResponse:
+      type: object
+      required: [slotKey, content, updatedAt]
+      properties:
+        slotKey:
+          type: string
+        content:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+
+    AdminDocumentVersionListResponse:
+      type: object
+      properties:
+        versions:
+          type: array
+          items:
+            type: object
+            required: [id, savedAt, reason]
+            properties:
+              id:
+                type: string
+                format: uuid
+              savedAt:
+                type: string
+                format: date-time
+              reason:
+                type: string
+                enum: [NORMAL_WRITE, CONFLICT_DISCARDED, MANUAL_RESTORE]
+
+    AuditLogEntryResponse:
+      type: object
+      required: [id, action, occurredAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        extensionId:
+          type: string
+          format: uuid
+          nullable: true
+        action:
+          type: string
+        details:
+          type: string
+          nullable: true
+        occurredAt:
+          type: string
+          format: date-time
+
+    AuditLogPageResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditLogEntryResponse'
+        page:
+          type: integer
+        size:
+          type: integer
+        totalElements:
+          type: integer
+          format: int64
+
+    ErrorResponse:
+      type: object
+      required: [status, error, message, path, timestamp]
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+        error:
+          type: string
+        message:
+          type: string
+        path:
+          type: string

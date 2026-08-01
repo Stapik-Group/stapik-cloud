@@ -1,0 +1,7 @@
+stapik-cloud:
+  security:
+    jwt:
+      secret: test-only-secret-never-use-in-production-aaaaaaaaaaaaaaaaaaaaaaaa
+  admin-bootstrap:
+    username: test-admin
+    password: test-admin-password

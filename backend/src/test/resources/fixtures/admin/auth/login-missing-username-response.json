@@ -1,0 +1,10 @@
+{
+  "detail": "username: must not be null",
+  "instance": "/api/admin/auth/login",
+  "status": 400,
+  "title": "Bad Request",
+  "type": "urn:error:validation:bad-request",
+  "errors": {
+    "username": "must not be null"
+  }
+}

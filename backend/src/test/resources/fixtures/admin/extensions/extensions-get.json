@@ -1,0 +1,7 @@
+{
+  "slug": "single-extension-slug",
+  "displayName": "Single extension",
+  "enabled": true,
+  "color": "#000000",
+  "iconGlyph": "icon-default"
+}

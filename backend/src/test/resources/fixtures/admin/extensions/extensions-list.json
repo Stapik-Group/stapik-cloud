@@ -1,0 +1,11 @@
+{
+  "extensions": [
+    {
+      "slug": "list-slug",
+      "displayName": "List Ext",
+      "enabled": true,
+      "color": "#000000",
+      "iconGlyph": "icon-default"
+    }
+  ]
+}

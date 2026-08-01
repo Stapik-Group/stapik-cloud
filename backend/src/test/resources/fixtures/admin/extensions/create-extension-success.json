@@ -1,0 +1,6 @@
+{
+  "slug": "new-extension",
+  "displayName": "New Extension",
+  "iconGlyph": "icon-app",
+  "color": "#FF0000"
+}

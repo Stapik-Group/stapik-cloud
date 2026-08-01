@@ -1,0 +1,412 @@
+openapi: 3.0.3
+info:
+  title: Stapik Cloud - Application API
+  version: 1.0.0
+  description: >
+    API used by Stapik ecosystem client applications (desktop C++/GTK4, Android) to
+    sync documents and binary assets. Authentication: x-api-key header, a key is
+    assigned 1:1 to a single Extension and a single device.
+
+servers:
+  - url: /api/v1
+
+security:
+  - ApiKeyAuth: []
+
+tags:
+  - name: documents
+  - name: assets
+  - name: system
+
+paths:
+  /documents/{slotKey}:
+    get:
+      operationId: getDocument
+      tags: [documents]
+      summary: Get the current content of a document in the given slot
+      parameters:
+        - $ref: '#/components/parameters/SlotKeyParam'
+      responses:
+        '200':
+          description: Current document content
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        '404':
+          description: Document slot or document not found
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+    put:
+      operationId: writeDocument
+      tags: [documents]
+      summary: Write document content (last-write-wins, optionally with shadow copy)
+      parameters:
+        - $ref: '#/components/parameters/SlotKeyParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentWriteRequest'
+      responses:
+        '200':
+          description: Saved, returns the current state after the write
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        '404':
+          description: Document slot not found
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+        '409':
+          description: >
+            The write lost against a newer copy in the cloud (last-write-wins) - the
+            client's content was saved to history as CONFLICT_DISCARDED if the slot
+            has shadow copy enabled.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+    delete:
+      operationId: deleteDocument
+      tags: [documents]
+      summary: Delete a document (soft-delete, keeps version history)
+      parameters:
+        - $ref: '#/components/parameters/SlotKeyParam'
+      responses:
+        '204':
+          description: Deleted
+        '404':
+          description: Document slot or document not found
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+
+
+  /documents/{slotKey}/versions:
+    get:
+      operationId: listDocumentVersions
+      tags: [documents]
+      summary: List historical versions of a document
+      parameters:
+        - $ref: '#/components/parameters/SlotKeyParam'
+      responses:
+        '200':
+          description: List of versions, newest first
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentVersionListResponse'
+        '404':
+          description: Document slot or document not found
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+
+  /documents/{slotKey}/versions/{versionId}/restore:
+    post:
+      operationId: restoreDocumentVersion
+      tags: [documents]
+      summary: Restore the given version as the current document content
+      parameters:
+        - $ref: '#/components/parameters/SlotKeyParam'
+        - name: versionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Restored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        '404':
+          description: Document slot, document or version not found
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+
+  /assets/{slotKey}:
+    get:
+      operationId: listAssets
+      tags: [assets]
+      summary: List files in a BINARY_COLLECTION slot
+      parameters:
+        - $ref: '#/components/parameters/SlotKeyParam'
+      responses:
+        '200':
+          description: List of files with metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetListResponse'
+        '404':
+          description: Document slot not found
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+
+  /assets/{slotKey}/{filename}:
+    get:
+      operationId: downloadAsset
+      tags: [assets]
+      summary: Download a binary file
+      parameters:
+        - $ref: '#/components/parameters/SlotKeyParam'
+        - $ref: '#/components/parameters/FilenameParam'
+      responses:
+        '200':
+          description: File content (streamed)
+          content:
+            multipart/form-data:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Document slot or asset not found
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+    put:
+      operationId: uploadAsset
+      tags: [assets]
+      summary: Upload or overwrite a binary file (streamed)
+      parameters:
+        - $ref: '#/components/parameters/SlotKeyParam'
+        - $ref: '#/components/parameters/FilenameParam'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [ file ]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetMetadataResponse'
+        '404':
+          description: Document slot not found
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+        '413':
+          description: Maximum file size for this slot exceeded
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+    delete:
+      operationId: deleteAsset
+      tags: [assets]
+      summary: Delete a binary file
+      parameters:
+        - $ref: '#/components/parameters/SlotKeyParam'
+        - $ref: '#/components/parameters/FilenameParam'
+      responses:
+        '204':
+          description: Deleted
+        '404':
+          description: Document slot or asset not found
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+  /health:
+    get:
+      operationId: getHealth
+      tags: [system]
+      summary: Health check (no authentication required)
+      security: []
+      responses:
+        '200':
+          description: Service is up
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /me:
+    get:
+      operationId: getMe
+      tags: [system]
+      summary: Context of the currently used API key
+      responses:
+        '200':
+          description: Information about the key and its Extension
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeResponse'
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+
+  parameters:
+    SlotKeyParam:
+      name: slotKey
+      in: path
+      required: true
+      schema:
+        type: string
+    FilenameParam:
+      name: filename
+      in: path
+      required: true
+      schema:
+        type: string
+
+  responses:
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    DocumentResponse:
+      type: object
+      required: [slotKey, content, contentHash, updatedAt]
+      properties:
+        slotKey:
+          type: string
+        content:
+          type: string
+        contentHash:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+
+    DocumentWriteRequest:
+      type: object
+      required: [content, clientLastKnownUpdate]
+      properties:
+        content:
+          type: string
+        clientLastKnownUpdate:
+          type: string
+          format: date-time
+          description: Timestamp of the last version known to the client - basis for the last-write-wins comparison.
+
+    DocumentVersionResponse:
+      type: object
+      required: [id, savedAt, reason]
+      properties:
+        id:
+          type: string
+          format: uuid
+        savedAt:
+          type: string
+          format: date-time
+        reason:
+          $ref: '#/components/schemas/VersionReason'
+
+    VersionReason:
+      type: string
+      enum: [NORMAL_WRITE, CONFLICT_DISCARDED, MANUAL_RESTORE]
+
+    DocumentVersionListResponse:
+      type: object
+      properties:
+        versions:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentVersionResponse'
+
+    AssetMetadataResponse:
+      type: object
+      required: [filename, mimeType, sizeBytes, checksumSha256, updatedAt]
+      properties:
+        filename:
+          type: string
+        mimeType:
+          type: string
+        sizeBytes:
+          type: integer
+          format: int64
+        checksumSha256:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+
+    AssetListResponse:
+      type: object
+      properties:
+        assets:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssetMetadataResponse'
+
+    MeResponse:
+      type: object
+      required: [extensionId, extensionSlug, scope]
+      properties:
+        extensionId:
+          type: string
+          format: uuid
+        extensionSlug:
+          type: string
+        keyLabel:
+          type: string
+        scope:
+          type: string
+          enum: [READ_ONLY, READ_WRITE]
+        lastUsedAt:
+          type: string
+          format: date-time
+
+    HealthResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          example: UP
+        timestamp:
+          type: string
+          format: date-time
+
+    ErrorResponse:
+      type: object
+      required: [status, error, message, path, timestamp]
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+        error:
+          type: string
+        message:
+          type: string
+        path:
+          type: string

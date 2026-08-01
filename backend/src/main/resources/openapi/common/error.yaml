@@ -1,0 +1,14 @@
+components:
+  schemas:
+    Problem:
+      type: object
+      description: RFC 7807 structured error
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string

@@ -1,0 +1,10 @@
+{
+  "detail": "slug: must not be null",
+  "instance": "/api/admin/extensions",
+  "status": 400,
+  "title": "Bad Request",
+  "type": "urn:error:validation:bad-request",
+  "errors": {
+    "slug": "must not be null"
+  }
+}
