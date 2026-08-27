@@ -13,7 +13,7 @@
 
     <groupId>pl.stapik</groupId>
     <artifactId>stapik-cloud-backend</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
     <name>stapik-cloud-backend</name>
     <description>Self-hosted cloud sync backend for the Stapik ecosystem</description>
 
