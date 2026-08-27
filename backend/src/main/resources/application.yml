@@ -60,16 +60,6 @@ stapik-cloud:
     retention-days: ${AUDIT_RETENTION_DAYS:365}
 
 logging:
-  file:
-    name: logs/http-traffic.log
-    logback:
-      rollingpolicy:
-        max-file-size: 10MB
-        max-history: 30
-        total-size-cap: 1GB
-  pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} [traceId=%X{traceId}] - %msg%n"
-    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} [traceId=%X{traceId}] - %msg%n"
   level:
     root: INFO
     pl.stapik.cloud: ${APP_LOG_LEVEL:INFO}
