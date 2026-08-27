@@ -14,7 +14,7 @@ WORKDIR /app
 
 RUN addgroup -S spring && adduser -S spring -G spring
 COPY --from=build /app/target/*.jar app.jar
-RUN chown spring:spring app.jar
+RUN mkdir -p /app/logs && chown -R spring:spring /app
 
 USER spring
 EXPOSE 8080

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <springProperty name="APP_LOG_LEVEL" source="APP_LOG_LEVEL" defaultValue="INFO"/>
+
+    <!-- Console -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>
+                %d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} [traceId=%X{traceId}] - %msg%n
+            </pattern>
+        </encoder>
+    </appender>
+    
+    <!-- Http traffic file -->
+    <appender name="HTTP_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/http-traffic.log</file>
+        
+        <encoder>
+            <pattern>%msg%n</pattern>
+        </encoder>
+
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>
+                logs/http-traffic.%d{yyyy-MM-dd}.%i.log
+            </fileNamePattern>
+
+            <maxFileSize>10MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>1GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+    
+    <!-- Application -->
+    <root level="${APP_LOG_LEVEL}">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+    
+    <!-- HTTP console logger -->
+    <logger name="HTTP_CONSOLE" level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+    </logger>
+    
+    <!-- HTTP full logger -->
+    <logger name="HTTP_FULL" level="INFO" additivity="false">
+        <appender-ref ref="HTTP_FILE"/>
+    </logger>
+</configuration>
