@@ -456,6 +456,7 @@ components:
           default: true
         maxVersionsRetained:
           type: integer
+          minimum: 1
           default: 20
         conflictStrategy:
           allOf:

@@ -63,7 +63,7 @@ public class DocumentServiceImpl implements DocumentService {
                     .map(deleted -> applyContent(deleted, content))
                     .orElseGet(() -> createDocument(slot.getId(), content));
 
-            saveVersion(documentData.getId(), content, VersionReason.NORMAL_WRITE);
+            saveVersion(slot, documentData.getId(), content, VersionReason.NORMAL_WRITE);
             return new WriteResult(documentData, false);
         }
 
@@ -73,13 +73,13 @@ public class DocumentServiceImpl implements DocumentService {
 
         if (!decision.writeAccepted()) {
             if (decision.preserveDiscardedVersion()) {
-                saveVersion(existing.getId(), content, VersionReason.CONFLICT_DISCARDED);
+                saveVersion(slot, existing.getId(), content, VersionReason.CONFLICT_DISCARDED);
             }
             return new WriteResult(existing, true);
         }
 
         DocumentData saved = applyContent(existing, content);
-        saveVersion(saved.getId(), content, VersionReason.NORMAL_WRITE);
+        saveVersion(slot, saved.getId(), content, VersionReason.NORMAL_WRITE);
         return new WriteResult(saved, false);
     }
 
@@ -95,7 +95,7 @@ public class DocumentServiceImpl implements DocumentService {
                 .orElseThrow(() -> new NoSuchElementException("Version not found: " + versionId));
 
         DocumentData saved = applyContent(documentData, version.getContent());
-        saveVersion(saved.getId(), version.getContent(), VersionReason.MANUAL_RESTORE);
+        saveVersion(slot, saved.getId(), version.getContent(), VersionReason.MANUAL_RESTORE);
         return saved;
     }
 
@@ -127,7 +127,7 @@ public class DocumentServiceImpl implements DocumentService {
         return documentRepository.save(documentData);
     }
 
-    private void saveVersion(UUID documentId, String content, VersionReason reason) {
+    private void saveVersion(DocumentSlotData slot, UUID documentId, String content, VersionReason reason) {
         DocumentVersionData version = DocumentVersionData.builder()
                 .documentId(documentId)
                 .content(content)
@@ -136,6 +136,7 @@ public class DocumentServiceImpl implements DocumentService {
                 .build();
 
         documentVersionRepository.save(version);
+        documentVersionRepository.deleteAllExceptNewest(documentId, slot.getMaxVersionsRetained());
     }
 
     private DocumentData requireCurrentDocument(DocumentSlotData slot) {

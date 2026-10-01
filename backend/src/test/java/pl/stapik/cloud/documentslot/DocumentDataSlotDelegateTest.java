@@ -97,6 +97,18 @@ class DocumentDataSlotDelegateTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void shouldRejectSlotWithMaxVersionsRetainedBelowOne() throws Exception {
+        // given
+        String requestBody = readResource("fixtures/slots/create-slot-invalid-max-versions-request.json");
+
+        // when & then
+        mockMvc.perform(post("/api/admin/extensions/{extensionId}/slots", extensionId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void shouldReturnNotFoundWhenCreatingSlotForMissingExtension() throws Exception {
         // given
         UUID missingExtensionId = UUID.randomUUID();

@@ -178,6 +178,32 @@ class DocumentDataDelegateTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void shouldKeepOnlyConfiguredNumberOfVersionsAfterRepeatedWrites() throws Exception {
+        // given
+        int maxVersionsRetained = 3;
+        int writesCount = 6;
+        UUID slotId = UUID.randomUUID();
+        insertDocumentSlot(slotId, extensionId, "limited-slot", maxVersionsRetained);
+
+        // when
+        for (int writeNumber = 1; writeNumber <= writesCount; writeNumber++) {
+            String requestBody = "{\"content\": \"content-" + writeNumber + "\", "
+                    + "\"clientLastKnownUpdate\": \"2999-01-01T00:00:00Z\"}";
+            mockMvc.perform(put("/api/v1/documents/{slotKey}", "limited-slot")
+                            .header(API_KEY_HEADER, rawApiKey)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(requestBody))
+                    .andExpect(status().isOk());
+        }
+
+        // then
+        mockMvc.perform(get("/api/v1/documents/{slotKey}/versions", "limited-slot")
+                        .header(API_KEY_HEADER, rawApiKey))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.versions.length()").value(maxVersionsRetained));
+    }
+
+    @Test
     void shouldReturnNotFoundWhenListingVersionsForMissingSlot() throws Exception {
         // when & then
         mockMvc.perform(get("/api/v1/documents/{slotKey}/versions", "missing-slot")
@@ -246,6 +272,10 @@ class DocumentDataDelegateTest extends AbstractIntegrationTest {
     }
 
     private void insertDocumentSlot(UUID id, UUID extensionId, String slotKey) throws Exception {
+        insertDocumentSlot(id, extensionId, slotKey, 10);
+    }
+
+    private void insertDocumentSlot(UUID id, UUID extensionId, String slotKey, int maxVersionsRetained) throws Exception {
         try (Connection connection = dataSource.getConnection()) {
             String sql = "INSERT INTO document_slot (id, extension_id, slot_key, content_type, max_size_bytes, " +
                     "versioning_enabled, max_versions_retained, conflict_strategy, encryption_required, created_at) " +
@@ -257,7 +287,7 @@ class DocumentDataDelegateTest extends AbstractIntegrationTest {
                 ps.setString(4, "TEXT");
                 ps.setLong(5, 1_048_576L);
                 ps.setBoolean(6, true);
-                ps.setInt(7, 10);
+                ps.setInt(7, maxVersionsRetained);
                 ps.setString(8, "LAST_WRITE_WINS");
                 ps.setBoolean(9, false);
                 ps.setTimestamp(10, java.sql.Timestamp.from(Instant.now()));

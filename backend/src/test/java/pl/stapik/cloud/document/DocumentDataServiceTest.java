@@ -4,6 +4,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.stapik.cloud.document.conflict.ConflictDecision;
@@ -441,5 +442,99 @@ class DocumentDataServiceTest {
                 .isInstanceOf(NoSuchElementException.class);
 
         verify(documentRepository, never()).save(any());
+    }
+
+    private DocumentSlotData slotWithVersionLimit(int maxVersionsRetained) {
+        return DocumentSlotData.builder()
+                .id(SLOT_ID)
+                .extensionId(EXTENSION_ID)
+                .slotKey(SLOT_KEY)
+                .conflictStrategy(ConflictStrategy.LAST_WRITE_WINS_WITH_SHADOW_COPY)
+                .maxVersionsRetained(maxVersionsRetained)
+                .build();
+    }
+
+    @Test
+    void shouldPruneVersionsToSlotLimitAfterAcceptedWrite() {
+        // given
+        int maxVersionsRetained = 3;
+        DocumentSlotData slot = slotWithVersionLimit(maxVersionsRetained);
+        Instant existingUpdatedAt = Instant.parse("2026-07-18T10:00:00Z");
+        DocumentData existing = DocumentData.builder()
+                .id(UUID.randomUUID())
+                .documentSlotId(SLOT_ID)
+                .content("old")
+                .updatedAt(existingUpdatedAt)
+                .build();
+
+        when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY))
+                .thenReturn(Optional.of(slot));
+        when(documentRepository.findByDocumentSlotId(SLOT_ID)).thenReturn(Optional.of(existing));
+        when(conflictResolver.supports()).thenReturn(ConflictStrategy.LAST_WRITE_WINS_WITH_SHADOW_COPY);
+        when(conflictResolver.resolve(existingUpdatedAt, existingUpdatedAt)).thenReturn(ConflictDecision.accept());
+        when(documentRepository.save(any(DocumentData.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // when
+        documentServiceImpl.write(DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), "new content", existingUpdatedAt);
+
+        // then
+        InOrder saveBeforePrune = inOrder(documentVersionRepository);
+        saveBeforePrune.verify(documentVersionRepository).save(any(DocumentVersionData.class));
+        saveBeforePrune.verify(documentVersionRepository).deleteAllExceptNewest(existing.getId(), maxVersionsRetained);
+    }
+
+    @Test
+    void shouldPruneVersionsToSlotLimitAfterPreservingDiscardedVersion() {
+        // given
+        int maxVersionsRetained = 5;
+        DocumentSlotData slot = slotWithVersionLimit(maxVersionsRetained);
+        Instant existingUpdatedAt = Instant.parse("2026-07-18T10:00:00Z");
+        Instant clientLastKnown = Instant.parse("2026-07-18T09:00:00Z");
+        DocumentData existing = DocumentData.builder()
+                .id(UUID.randomUUID())
+                .documentSlotId(SLOT_ID)
+                .content("current content")
+                .updatedAt(existingUpdatedAt)
+                .build();
+
+        when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY))
+                .thenReturn(Optional.of(slot));
+        when(documentRepository.findByDocumentSlotId(SLOT_ID)).thenReturn(Optional.of(existing));
+        when(conflictResolver.supports()).thenReturn(ConflictStrategy.LAST_WRITE_WINS_WITH_SHADOW_COPY);
+        when(conflictResolver.resolve(existingUpdatedAt, clientLastKnown))
+                .thenReturn(new ConflictDecision(false, true));
+
+        // when
+        documentServiceImpl.write(DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), "conflicting content", clientLastKnown);
+
+        // then
+        verify(documentVersionRepository).deleteAllExceptNewest(existing.getId(), maxVersionsRetained);
+    }
+
+    @Test
+    void shouldPruneVersionsToSlotLimitAfterRestore() {
+        // given
+        int maxVersionsRetained = 2;
+        DocumentSlotData slot = slotWithVersionLimit(maxVersionsRetained);
+        UUID documentId = UUID.randomUUID();
+        DocumentData documentData = DocumentData.builder().id(documentId).documentSlotId(SLOT_ID).content("current").build();
+        UUID versionId = UUID.randomUUID();
+        DocumentVersionData version = DocumentVersionData.builder()
+                .id(versionId)
+                .documentId(documentId)
+                .content("restored content")
+                .build();
+
+        when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY))
+                .thenReturn(Optional.of(slot));
+        when(documentRepository.findByDocumentSlotId(SLOT_ID)).thenReturn(Optional.of(documentData));
+        when(documentVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
+        when(documentRepository.save(any(DocumentData.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // when
+        documentServiceImpl.restoreVersion(DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), versionId);
+
+        // then
+        verify(documentVersionRepository).deleteAllExceptNewest(documentId, maxVersionsRetained);
     }
 }
