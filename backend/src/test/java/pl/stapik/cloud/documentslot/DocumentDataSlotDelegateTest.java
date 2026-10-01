@@ -140,15 +140,13 @@ class DocumentDataSlotDelegateTest extends AbstractIntegrationTest {
 
     private void insertExtension(UUID id, String slug, String displayName) throws Exception {
         try (Connection connection = dataSource.getConnection()) {
-            String sql = "INSERT INTO extension (id, slug, display_name, icon_glyph, color, enabled, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)";
+            String sql = "INSERT INTO extension (id, slug, display_name, enabled, created_at) VALUES (?, ?, ?, ?, ?)";
             try (PreparedStatement ps = connection.prepareStatement(sql)) {
                 ps.setObject(1, id);
                 ps.setString(2, slug);
                 ps.setString(3, displayName);
-                ps.setString(4, "icon-default");
-                ps.setString(5, "#000000");
-                ps.setBoolean(6, true);
-                ps.setTimestamp(7, java.sql.Timestamp.from(Instant.now()));
+                ps.setBoolean(4, true);
+                ps.setTimestamp(5, java.sql.Timestamp.from(Instant.now()));
                 ps.executeUpdate();
             }
         }

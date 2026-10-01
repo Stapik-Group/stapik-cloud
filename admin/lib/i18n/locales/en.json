@@ -52,8 +52,6 @@
   "newExtension.title": "New extension",
   "newExtension.slug": "Slug",
   "newExtension.displayName": "Name",
-  "newExtension.iconGlyph": "Icon (optional)",
-  "newExtension.color": "Color (optional)",
   "newExtension.submit": "Create",
   "newExtension.submitting": "Creating...",
   "newExtension.cancel": "Cancel",

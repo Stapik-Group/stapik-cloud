@@ -33,8 +33,6 @@ class ExtensionMapperTest {
         entity.setId(id);
         entity.setSlug("test-slug");
         entity.setDisplayName("Test Display Name");
-        entity.setIconGlyph("icon-test");
-        entity.setColor("#FFFFFF");
         entity.setEnabled(true);
         entity.setCreatedAt(createdAt);
 
@@ -46,8 +44,6 @@ class ExtensionMapperTest {
         assertThat(response.getId()).isEqualTo(id);
         assertThat(response.getSlug()).isEqualTo("test-slug");
         assertThat(response.getDisplayName()).isEqualTo("Test Display Name");
-        assertThat(response.getIconGlyph()).isEqualTo("icon-test");
-        assertThat(response.getColor()).isEqualTo("#FFFFFF");
         assertThat(response.getEnabled()).isTrue();
     }
 
@@ -57,8 +53,6 @@ class ExtensionMapperTest {
         CreateExtensionRequest request = new CreateExtensionRequest();
         request.setSlug("new-slug");
         request.setDisplayName("New Extension");
-        request.setIconGlyph("icon-new");
-        request.setColor("#000000");
 
         // When
         ExtensionData entity = extensionMapper.toEntity(request);
@@ -67,8 +61,6 @@ class ExtensionMapperTest {
         assertThat(entity).isNotNull();
         assertThat(entity.getSlug()).isEqualTo("new-slug");
         assertThat(entity.getDisplayName()).isEqualTo("New Extension");
-        assertThat(entity.getIconGlyph()).isEqualTo("icon-new");
-        assertThat(entity.getColor()).isEqualTo("#000000");
         assertThat(entity.getId()).isNull();
         assertThat(entity.isEnabled()).isFalse();
         assertThat(entity.getCreatedAt()).isNull();

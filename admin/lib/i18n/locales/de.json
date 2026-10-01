@@ -52,8 +52,6 @@
   "newExtension.title": "Neue Erweiterung",
   "newExtension.slug": "Slug",
   "newExtension.displayName": "Name",
-  "newExtension.iconGlyph": "Symbol (optional)",
-  "newExtension.color": "Farbe (optional)",
   "newExtension.submit": "Erstellen",
   "newExtension.submitting": "Wird erstellt...",
   "newExtension.cancel": "Abbrechen",

@@ -41,15 +41,13 @@ class SystemDelegateTest extends AbstractIntegrationTest {
             connection.createStatement().execute("DELETE FROM api_key");
             connection.createStatement().execute("DELETE FROM extension");
 
-            String sql = "INSERT INTO extension (id, slug, display_name, icon_glyph, color, enabled, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)";
+            String sql = "INSERT INTO extension (id, slug, display_name, enabled, created_at) VALUES (?, ?, ?, ?, ?)";
             try (PreparedStatement ps = connection.prepareStatement(sql)) {
                 ps.setObject(1, extensionId);
                 ps.setString(2, "system-slug");
                 ps.setString(3, "System Ext");
-                ps.setString(4, "icon-sys");
-                ps.setString(5, "#000000");
-                ps.setBoolean(6, true);
-                ps.setTimestamp(7, java.sql.Timestamp.from(Instant.now()));
+                ps.setBoolean(4, true);
+                ps.setTimestamp(5, java.sql.Timestamp.from(Instant.now()));
                 ps.executeUpdate();
             }
         }

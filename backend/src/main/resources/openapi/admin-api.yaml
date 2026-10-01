@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Stapik Cloud - Admin API
-  version: 1.0.0
+  version: 1.0.1
   description: >
     Admin panel API (React) - login, extension wizard, slot/key management, document
     browser, audit log. Authentication: JWT (Bearer), fully separated from client
@@ -413,10 +413,6 @@ components:
           type: string
         displayName:
           type: string
-        iconGlyph:
-          type: string
-        color:
-          type: string
 
     ExtensionResponse:
       type: object
@@ -428,10 +424,6 @@ components:
         slug:
           type: string
         displayName:
-          type: string
-        iconGlyph:
-          type: string
-        color:
           type: string
         enabled:
           type: boolean

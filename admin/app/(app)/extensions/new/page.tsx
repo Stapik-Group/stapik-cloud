@@ -12,8 +12,6 @@ export default function NewExtensionPage() {
     const { t } = useTranslation();
     const [slug, setSlug] = useState("");
     const [displayName, setDisplayName] = useState("");
-    const [iconGlyph, setIconGlyph] = useState("");
-    const [color, setColor] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -25,8 +23,6 @@ export default function NewExtensionPage() {
         const payload: CreateExtensionRequest = {
             slug,
             displayName,
-            ...(iconGlyph ? { iconGlyph } : {}),
-            ...(color ? { color } : {}),
         };
 
         try {
@@ -80,33 +76,6 @@ export default function NewExtensionPage() {
                         onChange={(e) => setDisplayName(e.target.value)}
                         className="input w-full"
                         placeholder="Stapik Calendar (desktop)"
-                    />
-                </div>
-
-                <div className="space-y-1">
-                    <label htmlFor="iconGlyph" className="text-sm text-text-muted">
-                        {t("newExtension.iconGlyph")}
-                    </label>
-                    <input
-                        id="iconGlyph"
-                        type="text"
-                        value={iconGlyph}
-                        onChange={(e) => setIconGlyph(e.target.value)}
-                        className="input w-full"
-                    />
-                </div>
-
-                <div className="space-y-1">
-                    <label htmlFor="color" className="text-sm text-text-muted">
-                        {t("newExtension.color")}
-                    </label>
-                    <input
-                        id="color"
-                        type="text"
-                        value={color}
-                        onChange={(e) => setColor(e.target.value)}
-                        className="input w-full"
-                        placeholder="#4f46e5"
                     />
                 </div>
 
