@@ -75,6 +75,13 @@
   "slots.deleteButton": "Löschen",
   "documents.restoreConfirm": "Diese Version als aktuellen Dokumentinhalt wiederherstellen?",
   "documents.restoring": "...",
+  "documents.editorSave": "Speichern",
+  "documents.editorSaving": "Speichern...",
+  "documents.editorDiscard": "Änderungen verwerfen",
+  "documents.editorInvalidJson": "Ungültiges JSON: {message}",
+  "documents.editorSaveError": "Dokument konnte nicht gespeichert werden (HTTP {status}).",
+  "documents.editorConflict": "Das Dokument wurde nach dem Öffnen geändert. Deine Änderungen wurden nicht gespeichert.",
+  "documents.editorReloadLatest": "Meine Änderungen verwerfen und die aktuelle Version laden",
   "apiKeys.revokeConfirm": "Diesen Schlüssel widerrufen? Dies kann nicht rückgängig gemacht werden.",
   "apiKeys.revoking": "...",
   "apiKeys.revokeButton": "Widerrufen"

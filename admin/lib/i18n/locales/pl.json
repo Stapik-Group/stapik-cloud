@@ -75,6 +75,13 @@
   "slots.deleteButton": "Usuń",
   "documents.restoreConfirm": "Przywrócić tę wersję jako aktualną treść dokumentu?",
   "documents.restoring": "...",
+  "documents.editorSave": "Zapisz",
+  "documents.editorSaving": "Zapisywanie...",
+  "documents.editorDiscard": "Odrzuć zmiany",
+  "documents.editorInvalidJson": "Niepoprawny JSON: {message}",
+  "documents.editorSaveError": "Nie udało się zapisać dokumentu (HTTP {status}).",
+  "documents.editorConflict": "Dokument został zmieniony po jego otwarciu. Twoje zmiany nie zostały zapisane.",
+  "documents.editorReloadLatest": "Odrzuć moje zmiany i wczytaj aktualną wersję",
   "apiKeys.revokeConfirm": "Odwołać ten klucz? Tego nie da się cofnąć.",
   "apiKeys.revoking": "...",
   "apiKeys.revokeButton": "Odwołaj"

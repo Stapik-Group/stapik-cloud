@@ -537,4 +537,83 @@ class DocumentDataServiceTest {
         // then
         verify(documentVersionRepository).deleteAllExceptNewest(documentId, maxVersionsRetained);
     }
+
+    @Test
+    void shouldUpdateContentWhenClientKnowsLatestUpdate() {
+        // given
+        int maxVersionsRetained = 4;
+        DocumentSlotData slot = slotWithVersionLimit(maxVersionsRetained);
+        Instant existingUpdatedAt = Instant.parse("2026-07-18T10:00:00Z");
+        DocumentData existing = DocumentData.builder()
+                .id(UUID.randomUUID())
+                .documentSlotId(SLOT_ID)
+                .content("old")
+                .updatedAt(existingUpdatedAt)
+                .build();
+
+        when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY))
+                .thenReturn(Optional.of(slot));
+        when(documentRepository.findByDocumentSlotId(SLOT_ID)).thenReturn(Optional.of(existing));
+        when(documentRepository.save(any(DocumentData.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // when
+        DocumentData result = documentServiceImpl.updateContent(
+                DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), "edited by admin", existingUpdatedAt);
+
+        // then
+        assertThat(result.getContent()).isEqualTo("edited by admin");
+        assertThat(result.getUpdatedAt()).isAfter(existingUpdatedAt);
+
+        verify(documentVersionRepository).save(argThat(version ->
+                version.getReason() == VersionReason.NORMAL_WRITE
+                        && version.getContent().equals("edited by admin")
+                        && version.getDocumentId().equals(existing.getId())
+        ));
+        verify(documentVersionRepository).deleteAllExceptNewest(existing.getId(), maxVersionsRetained);
+        verifyNoInteractions(conflictResolver);
+    }
+
+    @Test
+    void shouldRejectUpdateContentWhenDocumentChangedAfterClientLoadedIt() {
+        // given
+        DocumentSlotData slot = slot(ConflictStrategy.LAST_WRITE_WINS);
+        Instant existingUpdatedAt = Instant.parse("2026-07-18T10:00:00Z");
+        Instant clientLastKnown = Instant.parse("2026-07-18T09:00:00Z");
+        DocumentData existing = DocumentData.builder()
+                .id(UUID.randomUUID())
+                .documentSlotId(SLOT_ID)
+                .content("current content")
+                .updatedAt(existingUpdatedAt)
+                .build();
+
+        when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY))
+                .thenReturn(Optional.of(slot));
+        when(documentRepository.findByDocumentSlotId(SLOT_ID)).thenReturn(Optional.of(existing));
+
+        // when / then
+        DocumentIdentifier documentIdentifier = DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY);
+        assertThatThrownBy(() -> documentServiceImpl.updateContent(documentIdentifier, "edited by admin", clientLastKnown))
+                .isInstanceOf(DocumentModifiedException.class)
+                .hasMessageContaining(SLOT_KEY);
+
+        verify(documentRepository, never()).save(any());
+        verifyNoInteractions(documentVersionRepository);
+    }
+
+    @Test
+    void shouldThrowWhenDocumentNotFoundOnUpdateContent() {
+        // given
+        DocumentSlotData slot = slot(ConflictStrategy.LAST_WRITE_WINS);
+        when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY))
+                .thenReturn(Optional.of(slot));
+        when(documentRepository.findByDocumentSlotId(SLOT_ID)).thenReturn(Optional.empty());
+
+        // when / then
+        DocumentIdentifier documentIdentifier = DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY);
+        assertThatThrownBy(() -> documentServiceImpl.updateContent(documentIdentifier, "content", Instant.now()))
+                .isInstanceOf(NoSuchElementException.class);
+
+        verify(documentRepository, never()).save(any());
+        verifyNoInteractions(documentVersionRepository);
+    }
 }

@@ -75,6 +75,13 @@
   "slots.deleteButton": "Delete",
   "documents.restoreConfirm": "Restore this version as the current document content?",
   "documents.restoring": "...",
+  "documents.editorSave": "Save",
+  "documents.editorSaving": "Saving...",
+  "documents.editorDiscard": "Discard changes",
+  "documents.editorInvalidJson": "Invalid JSON: {message}",
+  "documents.editorSaveError": "Failed to save the document (HTTP {status}).",
+  "documents.editorConflict": "The document was modified after you opened it. Your changes were not saved.",
+  "documents.editorReloadLatest": "Discard my changes and load the latest version",
   "apiKeys.revokeConfirm": "Revoke this key? This cannot be undone.",
   "apiKeys.revoking": "...",
   "apiKeys.revokeButton": "Revoke"

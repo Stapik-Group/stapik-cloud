@@ -255,6 +255,36 @@ paths:
                 $ref: '#/components/schemas/AdminDocumentResponse'
         '404':
           $ref: '#/components/responses/NotFound'
+    put:
+      operationId: updateDocumentContent
+      tags: [admin-documents]
+      summary: Edit the current document content (admin editor)
+      parameters:
+        - $ref: '#/components/parameters/ExtensionIdParam'
+        - $ref: '#/components/parameters/SlotKeyPathParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminDocumentWriteRequest'
+      responses:
+        '200':
+          description: Document content updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminDocumentResponse'
+        '400':
+          description: Missing information in request
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Document was modified after the supplied clientLastKnownUpdate
 
   /extensions/{extensionId}/documents/{slotKey}/versions:
     get:
@@ -553,6 +583,16 @@ components:
         content:
           type: string
         updatedAt:
+          type: string
+          format: date-time
+
+    AdminDocumentWriteRequest:
+      type: object
+      required: [content, clientLastKnownUpdate]
+      properties:
+        content:
+          type: string
+        clientLastKnownUpdate:
           type: string
           format: date-time
 

@@ -7,6 +7,7 @@ import pl.stapik.cloud.admin.api.AdminDocumentsApiDelegate;
 import pl.stapik.cloud.admin.data.AdminDocumentResponse;
 import pl.stapik.cloud.admin.data.AdminDocumentVersionListResponse;
 import pl.stapik.cloud.admin.data.AdminDocumentVersionListResponseVersionsInner;
+import pl.stapik.cloud.admin.data.AdminDocumentWriteRequest;
 import pl.stapik.cloud.document.data.DocumentData;
 import pl.stapik.cloud.document.dto.DocumentIdentifier;
 
@@ -24,6 +25,16 @@ public class AdminDocumentDelegate implements AdminDocumentsApiDelegate {
     public ResponseEntity<AdminDocumentResponse> getDocumentContent(UUID extensionId, String slotKey) {
         DocumentData document = documentService.getCurrent(DocumentIdentifier.of(extensionId, slotKey));
         return ResponseEntity.ok(documentMapper.toAdminDocumentResponse(document, slotKey));
+    }
+
+    @Override
+    public ResponseEntity<AdminDocumentResponse> updateDocumentContent(UUID extensionId, String slotKey, AdminDocumentWriteRequest request) {
+        DocumentData updated = documentService.updateContent(
+                DocumentIdentifier.of(extensionId, slotKey),
+                request.getContent(),
+                request.getClientLastKnownUpdate().toInstant()
+        );
+        return ResponseEntity.ok(documentMapper.toAdminDocumentResponse(updated, slotKey));
     }
 
     @Override

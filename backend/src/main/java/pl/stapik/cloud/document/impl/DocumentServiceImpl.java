@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pl.stapik.cloud.audit.Auditing;
 import pl.stapik.cloud.audit.data.AuditAction;
+import pl.stapik.cloud.document.DocumentModifiedException;
 import pl.stapik.cloud.document.DocumentRepository;
 import pl.stapik.cloud.document.DocumentService;
 import pl.stapik.cloud.document.DocumentVersionRepository;
@@ -96,6 +97,22 @@ public class DocumentServiceImpl implements DocumentService {
 
         DocumentData saved = applyContent(documentData, version.getContent());
         saveVersion(slot, saved.getId(), version.getContent(), VersionReason.MANUAL_RESTORE);
+        return saved;
+    }
+
+    @Transactional
+    @Override
+    @Auditing(action = AuditAction.DOCUMENT_CONTENT_EDITED)
+    public DocumentData updateContent(DocumentIdentifier identifier, String content, Instant clientLastKnownUpdate) {
+        DocumentSlotData slot = requireSlot(identifier);
+        DocumentData existing = requireCurrentDocument(slot);
+
+        if (clientLastKnownUpdate.isBefore(existing.getUpdatedAt())) {
+            throw new DocumentModifiedException(slot.getSlotKey());
+        }
+
+        DocumentData saved = applyContent(existing, content);
+        saveVersion(slot, saved.getId(), content, VersionReason.NORMAL_WRITE);
         return saved;
     }
 

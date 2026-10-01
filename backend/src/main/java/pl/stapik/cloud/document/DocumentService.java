@@ -14,5 +14,6 @@ public interface DocumentService {
     List<DocumentVersionData> listVersions(DocumentIdentifier identifier);
     WriteResult write(DocumentIdentifier identifier, String content, Instant clientLastKnownUpdate);
     DocumentData restoreVersion(DocumentIdentifier identifier, UUID versionId);
+    DocumentData updateContent(DocumentIdentifier identifier, String content, Instant clientLastKnownUpdate);
     void delete(DocumentIdentifier identifier);
 }

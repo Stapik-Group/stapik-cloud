@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { adminApiFetch } from "@/lib/api-client";
+import { JsonDocumentEditor } from "@/components/JsonDocumentEditor";
 import { RestoreVersionButton } from "@/components/RestoreVersionButton";
 import type { components } from "@/lib/api-types";
 
@@ -9,6 +10,7 @@ import { translate } from "@/lib/i18n/translations";
 
 type AdminDocumentResponse = components["schemas"]["AdminDocumentResponse"];
 type AdminDocumentVersionListResponse = components["schemas"]["AdminDocumentVersionListResponse"];
+type DocumentSlotListResponse = components["schemas"]["DocumentSlotListResponse"];
 type DocumentVersionEntry = NonNullable<AdminDocumentVersionListResponse["versions"]>[number];
 
 export default async function DocumentBrowserPage({ params, }: {
@@ -26,11 +28,12 @@ export default async function DocumentBrowserPage({ params, }: {
         MANUAL_RESTORE: "documents.reason.MANUAL_RESTORE",
     };
 
-    const [documentRes, versionsRes] = await Promise.all([
+    const [documentRes, versionsRes, slotsRes] = await Promise.all([
         adminApiFetch(`/api/admin/extensions/${extensionId}/documents/${slotKey}`),
         adminApiFetch(
             `/api/admin/extensions/${extensionId}/documents/${slotKey}/versions`,
         ),
+        adminApiFetch(`/api/admin/extensions/${extensionId}/slots`),
     ]);
 
     if (documentRes.status === 401) {
@@ -41,7 +44,7 @@ export default async function DocumentBrowserPage({ params, }: {
         notFound();
     }
 
-    if (!documentRes.ok || !versionsRes.ok) {
+    if (!documentRes.ok || !versionsRes.ok || !slotsRes.ok) {
         return (
             <main className="p-8">
                 <p className="text-danger">{t("documents.fetchError")}</p>
@@ -52,6 +55,9 @@ export default async function DocumentBrowserPage({ params, }: {
     const document: AdminDocumentResponse = await documentRes.json();
     const versionsData: AdminDocumentVersionListResponse = await versionsRes.json();
     const versions = versionsData.versions ?? [];
+    const slotsData: DocumentSlotListResponse = await slotsRes.json();
+    const slot = (slotsData.slots ?? []).find((slotEntry) => slotEntry.slotKey === slotKey);
+    const isJsonEditable = slot?.contentType === "JSON" && !slot.encryptionRequired;
 
     return (
         <main className="p-8 space-y-6 max-w-4xl">
@@ -69,9 +75,19 @@ export default async function DocumentBrowserPage({ params, }: {
 
             <section className="space-y-2">
                 <h2 className="font-medium">{t("documents.currentContent")}</h2>
-                <pre className="panel overflow-auto max-h-96 text-sm whitespace-pre-wrap break-all">
+                {isJsonEditable ? (
+                    <JsonDocumentEditor
+                        key={document.updatedAt}
+                        extensionId={extensionId}
+                        slotKey={slotKey}
+                        storedContent={document.content}
+                        lastKnownUpdate={document.updatedAt}
+                    />
+                ) : (
+                    <pre className="panel overflow-auto max-h-96 text-sm whitespace-pre-wrap break-all">
           {document.content}
         </pre>
+                )}
             </section>
 
             <section className="space-y-2">
