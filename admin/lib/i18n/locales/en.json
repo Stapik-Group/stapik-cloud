@@ -82,6 +82,9 @@
   "documents.editorSaveError": "Failed to save the document (HTTP {status}).",
   "documents.editorConflict": "The document was modified after you opened it. Your changes were not saved.",
   "documents.editorReloadLatest": "Discard my changes and load the latest version",
+  "documents.download": "Download",
+  "documents.downloading": "Downloading...",
+  "documents.downloadError": "Failed to download the document (HTTP {status}).",
   "apiKeys.revokeConfirm": "Revoke this key? This cannot be undone.",
   "apiKeys.revoking": "...",
   "apiKeys.revokeButton": "Revoke"

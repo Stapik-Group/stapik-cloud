@@ -82,6 +82,9 @@
   "documents.editorSaveError": "Nie udało się zapisać dokumentu (HTTP {status}).",
   "documents.editorConflict": "Dokument został zmieniony po jego otwarciu. Twoje zmiany nie zostały zapisane.",
   "documents.editorReloadLatest": "Odrzuć moje zmiany i wczytaj aktualną wersję",
+  "documents.download": "Pobierz",
+  "documents.downloading": "Pobieranie...",
+  "documents.downloadError": "Nie udało się pobrać dokumentu (HTTP {status}).",
   "apiKeys.revokeConfirm": "Odwołać ten klucz? Tego nie da się cofnąć.",
   "apiKeys.revoking": "...",
   "apiKeys.revokeButton": "Odwołaj"

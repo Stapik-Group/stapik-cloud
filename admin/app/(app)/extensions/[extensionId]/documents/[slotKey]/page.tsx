@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { adminApiFetch } from "@/lib/api-client";
+import { DownloadDocumentButton } from "@/components/DownloadDocumentButton";
 import { JsonDocumentEditor } from "@/components/JsonDocumentEditor";
 import { RestoreVersionButton } from "@/components/RestoreVersionButton";
 import type { components } from "@/lib/api-types";
@@ -58,6 +59,7 @@ export default async function DocumentBrowserPage({ params, }: {
     const slotsData: DocumentSlotListResponse = await slotsRes.json();
     const slot = (slotsData.slots ?? []).find((slotEntry) => slotEntry.slotKey === slotKey);
     const isJsonEditable = slot?.contentType === "JSON" && !slot.encryptionRequired;
+    const downloadMimeType = slot?.contentType === "JSON" ? "application/json" : "text/plain";
 
     return (
         <main className="p-8 space-y-6 max-w-4xl">
@@ -74,7 +76,14 @@ export default async function DocumentBrowserPage({ params, }: {
             </div>
 
             <section className="space-y-2">
-                <h2 className="font-medium">{t("documents.currentContent")}</h2>
+                <div className="flex items-center justify-between">
+                    <h2 className="font-medium">{t("documents.currentContent")}</h2>
+                    <DownloadDocumentButton
+                        extensionId={extensionId}
+                        slotKey={slotKey}
+                        mimeType={downloadMimeType}
+                    />
+                </div>
                 {isJsonEditable ? (
                     <JsonDocumentEditor
                         key={document.updatedAt}
