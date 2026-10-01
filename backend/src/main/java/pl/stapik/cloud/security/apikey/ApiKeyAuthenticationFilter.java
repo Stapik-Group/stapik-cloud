@@ -7,7 +7,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import pl.stapik.cloud.apikey.data.ApiKeyData;
 import pl.stapik.cloud.apikey.ApiKeyRepository;
@@ -17,7 +16,6 @@ import pl.stapik.cloud.common.crypto.HashingService;
 import java.io.IOException;
 import java.time.Instant;
 
-@Component
 @RequiredArgsConstructor
 public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
 

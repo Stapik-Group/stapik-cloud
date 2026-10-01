@@ -12,6 +12,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import pl.stapik.cloud.AbstractIntegrationTest;
 import pl.stapik.cloud.common.crypto.HashingService;
+import pl.stapik.cloud.security.admin.JwtService;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -39,6 +40,9 @@ class SecurityE2ETest extends AbstractIntegrationTest {
 
     @Autowired
     private HashingService hashingService;
+
+    @Autowired
+    private JwtService jwtService;
 
     @Value("${stapik-cloud.security.jwt.secret}")
     private String jwtSecret;
@@ -77,6 +81,19 @@ class SecurityE2ETest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.extensionId").value(extensionId.toString()))
                 .andExpect(jsonPath("$.keyLabel").value("desktop-key"))
                 .andExpect(jsonPath("$.scope").value("READ_WRITE"));
+    }
+
+    @Test
+    void meWithValidApiKeyAndBearerTokenAuthenticatesByApiKey() throws Exception {
+        String rawKey = insertApiKey(extensionId, "desktop-key", "READ_WRITE", null, null, false);
+        String adminToken = jwtService.generateToken(UUID.randomUUID(), "security-admin-5", "OWNER");
+
+        mockMvc.perform(get("/api/v1/me")
+                        .header("x-api-key", rawKey)
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.extensionId").value(extensionId.toString()))
+                .andExpect(jsonPath("$.keyLabel").value("desktop-key"));
     }
 
     @Test
