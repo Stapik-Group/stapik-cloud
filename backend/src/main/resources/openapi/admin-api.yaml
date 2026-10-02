@@ -558,9 +558,6 @@ components:
           allOf:
             - $ref: '#/components/schemas/ConflictStrategy'
           default: LAST_WRITE_WINS_WITH_SHADOW_COPY
-        encryptionRequired:
-          type: boolean
-          default: false
 
     DocumentSlotResponse:
       allOf:

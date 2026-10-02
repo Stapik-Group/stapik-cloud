@@ -22,7 +22,6 @@ export function CreateSlotForm({ extensionId }: { extensionId: string }) {
     const [contentType, setContentType] = useState<ContentType>("JSON");
     const [versioningEnabled, setVersioningEnabled] = useState(true);
     const [maxVersionsRetained, setMaxVersionsRetained] = useState(20);
-    const [encryptionRequired, setEncryptionRequired] = useState(false);
     const [conflictStrategy, setConflictStrategy] = useState<ConflictStrategy | "">("");
     const [error, setError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -37,7 +36,6 @@ export function CreateSlotForm({ extensionId }: { extensionId: string }) {
             contentType,
             versioningEnabled,
             maxVersionsRetained,
-            encryptionRequired,
             ...(conflictStrategy ? { conflictStrategy } : {}),
         };
 
@@ -142,14 +140,6 @@ export function CreateSlotForm({ extensionId }: { extensionId: string }) {
                         onChange={(e) => setVersioningEnabled(e.target.checked)}
                     />
                     {t("slots.versioning")}
-                </label>
-                <label className="flex items-center gap-2 text-sm">
-                    <input
-                        type="checkbox"
-                        checked={encryptionRequired}
-                        onChange={(e) => setEncryptionRequired(e.target.checked)}
-                    />
-                    {t("slots.encryption")}
                 </label>
             </div>
 

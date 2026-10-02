@@ -78,8 +78,7 @@ class DocumentDataSlotServiceTest {
                 1_048_576L,
                 true,
                 10,
-                ConflictStrategy.LAST_WRITE_WINS,
-                false
+                ConflictStrategy.LAST_WRITE_WINS
         );
 
         // then
@@ -90,7 +89,6 @@ class DocumentDataSlotServiceTest {
         assertThat(result.isVersioningEnabled()).isTrue();
         assertThat(result.getMaxVersionsRetained()).isEqualTo(10);
         assertThat(result.getConflictStrategy()).isEqualTo(ConflictStrategy.LAST_WRITE_WINS);
-        assertThat(result.isEncryptionRequired()).isFalse();
         assertThat(result.getCreatedAt()).isNotNull();
     }
 
@@ -106,8 +104,7 @@ class DocumentDataSlotServiceTest {
                 1_048_576L,
                 true,
                 10,
-                ConflictStrategy.LAST_WRITE_WINS,
-                false
+                ConflictStrategy.LAST_WRITE_WINS
         ))
                 .isInstanceOf(NoSuchElementException.class)
                 .hasMessageContaining(EXTENSION_ID.toString());

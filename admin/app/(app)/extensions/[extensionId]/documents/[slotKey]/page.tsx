@@ -58,7 +58,7 @@ export default async function DocumentBrowserPage({ params, }: {
     const versions = versionsData.versions ?? [];
     const slotsData: DocumentSlotListResponse = await slotsRes.json();
     const slot = (slotsData.slots ?? []).find((slotEntry) => slotEntry.slotKey === slotKey);
-    const isJsonEditable = slot?.contentType === "JSON" && !slot.encryptionRequired;
+    const isJsonEditable = slot?.contentType === "JSON";
     const downloadMimeType = slot?.contentType === "JSON" ? "application/json" : "text/plain";
 
     return (

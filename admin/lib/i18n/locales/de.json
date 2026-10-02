@@ -23,7 +23,6 @@
   "slots.default": "Standard",
   "slots.maxVersionsRetained": "Max. gespeicherte Versionen",
   "slots.versioning": "Versionierung",
-  "slots.encryption": "Verschlüsselung",
   "slots.submit": "Slot hinzufügen",
   "slots.submitting": "Wird hinzugefügt...",
   "slots.createError": "Slot konnte nicht erstellt werden.",

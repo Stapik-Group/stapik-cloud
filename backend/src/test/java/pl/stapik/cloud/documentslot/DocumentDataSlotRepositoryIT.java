@@ -109,7 +109,6 @@ class DocumentDataSlotRepositoryIT extends AbstractIntegrationTest {
                 .versioningEnabled(true)
                 .maxVersionsRetained(10)
                 .conflictStrategy(ConflictStrategy.LAST_WRITE_WINS)
-                .encryptionRequired(false)
                 .createdAt(Instant.now())
                 .build();
         documentSlotRepository.save(slot);

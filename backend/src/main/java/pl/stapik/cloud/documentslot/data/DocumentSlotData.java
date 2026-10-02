@@ -44,9 +44,6 @@ public class DocumentSlotData {
     @Column(name = "conflict_strategy", nullable = false)
     private ConflictStrategy conflictStrategy;
 
-    @Column(name = "encryption_required", nullable = false)
-    private boolean encryptionRequired;
-
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 }

@@ -169,8 +169,8 @@ class AdminDocumentDelegateTest extends AbstractIntegrationTest {
     private void insertDocumentSlot(UUID id, UUID extensionId, String slotKey) throws Exception {
         try (Connection connection = dataSource.getConnection()) {
             String sql = "INSERT INTO document_slot (id, extension_id, slot_key, content_type, max_size_bytes, " +
-                    "versioning_enabled, max_versions_retained, conflict_strategy, encryption_required, created_at) " +
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                    "versioning_enabled, max_versions_retained, conflict_strategy, created_at) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
             try (PreparedStatement ps = connection.prepareStatement(sql)) {
                 ps.setObject(1, id);
                 ps.setObject(2, extensionId);
@@ -180,8 +180,7 @@ class AdminDocumentDelegateTest extends AbstractIntegrationTest {
                 ps.setBoolean(6, true);
                 ps.setInt(7, 10);
                 ps.setString(8, "LAST_WRITE_WINS");
-                ps.setBoolean(9, false);
-                ps.setTimestamp(10, java.sql.Timestamp.from(Instant.now()));
+                ps.setTimestamp(9, java.sql.Timestamp.from(Instant.now()));
                 ps.executeUpdate();
             }
         }

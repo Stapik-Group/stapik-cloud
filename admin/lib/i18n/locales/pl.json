@@ -23,7 +23,6 @@
   "slots.default": "domyślna",
   "slots.maxVersionsRetained": "Max wersji w historii",
   "slots.versioning": "Wersjonowanie",
-  "slots.encryption": "Hashowanie",
   "slots.submit": "Dodaj slot",
   "slots.submitting": "Dodawanie...",
   "slots.createError": "Nie udało się utworzyć slotu.",

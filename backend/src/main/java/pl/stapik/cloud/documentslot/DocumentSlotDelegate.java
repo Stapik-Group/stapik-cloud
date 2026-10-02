@@ -26,7 +26,6 @@ public class DocumentSlotDelegate implements SlotsApiDelegate {
     private static final boolean DEFAULT_VERSIONING_ENABLED = true;
     private static final int DEFAULT_MAX_VERSIONS_RETAINED = 20;
     private static final ConflictStrategy DEFAULT_CONFLICT_STRATEGY = ConflictStrategy.LAST_WRITE_WINS_WITH_SHADOW_COPY;
-    private static final boolean DEFAULT_ENCRYPTION_REQUIRED = false;
 
     private final DocumentSlotServiceImpl documentSlotServiceImpl;
     private final DocumentSlotMapper documentSlotMapper;
@@ -47,7 +46,6 @@ public class DocumentSlotDelegate implements SlotsApiDelegate {
         long maxSizeBytes = Optional.ofNullable(request.getMaxSizeBytes()).orElse(DEFAULT_MAX_SIZE_BYTES);
         boolean versioningEnabled = Optional.ofNullable(request.getVersioningEnabled()).orElse(DEFAULT_VERSIONING_ENABLED);
         int maxVersionsRetained = Optional.ofNullable(request.getMaxVersionsRetained()).orElse(DEFAULT_MAX_VERSIONS_RETAINED);
-        boolean encryptionRequired = Optional.ofNullable(request.getEncryptionRequired()).orElse(DEFAULT_ENCRYPTION_REQUIRED);
 
         ConflictStrategy conflictStrategy = Optional.ofNullable(request.getConflictStrategy()).isPresent()
                 ? ConflictStrategy.valueOf(request.getConflictStrategy().getValue())
@@ -59,8 +57,7 @@ public class DocumentSlotDelegate implements SlotsApiDelegate {
                 maxSizeBytes,
                 versioningEnabled,
                 maxVersionsRetained,
-                conflictStrategy,
-                encryptionRequired
+                conflictStrategy
         );
 
         return ResponseEntity.status(HttpStatus.CREATED).body(documentSlotMapper.toResponse(created));

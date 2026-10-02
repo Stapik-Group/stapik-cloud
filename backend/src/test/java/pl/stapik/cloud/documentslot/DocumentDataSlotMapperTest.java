@@ -31,7 +31,6 @@ class DocumentDataSlotMapperTest {
                 .versioningEnabled(true)
                 .maxVersionsRetained(10)
                 .conflictStrategy(ConflictStrategy.LAST_WRITE_WINS)
-                .encryptionRequired(false)
                 .createdAt(Instant.now())
                 .build();
 
@@ -47,7 +46,6 @@ class DocumentDataSlotMapperTest {
         assertThat(response.getVersioningEnabled()).isTrue();
         assertThat(response.getMaxVersionsRetained()).isEqualTo(10);
         assertThat(response.getConflictStrategy()).isEqualTo(pl.stapik.cloud.admin.data.ConflictStrategy.WINS);
-        assertThat(response.getEncryptionRequired()).isFalse();
     }
 
     @Test
@@ -61,7 +59,6 @@ class DocumentDataSlotMapperTest {
                 .versioningEnabled(false)
                 .maxVersionsRetained(5)
                 .conflictStrategy(ConflictStrategy.LAST_WRITE_WINS_WITH_SHADOW_COPY)
-                .encryptionRequired(true)
                 .createdAt(Instant.now())
                 .build();
 
@@ -84,7 +81,6 @@ class DocumentDataSlotMapperTest {
                 .versioningEnabled(true)
                 .maxVersionsRetained(1)
                 .conflictStrategy(ConflictStrategy.LAST_WRITE_WINS)
-                .encryptionRequired(false)
                 .createdAt(Instant.now())
                 .build();
 

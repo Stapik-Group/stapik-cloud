@@ -17,8 +17,7 @@ public interface DocumentSlotService {
             long maxSizeBytes,
             boolean versioningEnabled,
             int maxVersionsRetained,
-            ConflictStrategy conflictStrategy,
-            boolean encryptionRequired
+            ConflictStrategy conflictStrategy
     );
 
     void delete(UUID extensionId, UUID slotId);

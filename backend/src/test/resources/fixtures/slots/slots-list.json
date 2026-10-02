@@ -6,8 +6,7 @@
       "maxSizeBytes": 1048576,
       "versioningEnabled": true,
       "maxVersionsRetained": 20,
-      "conflictStrategy": "LAST_WRITE_WINS",
-      "encryptionRequired": false
+      "conflictStrategy": "LAST_WRITE_WINS"
     }
   ]
 }

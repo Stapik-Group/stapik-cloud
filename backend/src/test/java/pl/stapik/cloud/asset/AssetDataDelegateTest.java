@@ -216,8 +216,8 @@ class AssetDataDelegateTest extends AbstractIntegrationTest {
     private void insertSlot(UUID extensionId, String slotKey, long maxSizeBytes) throws Exception {
         try (Connection connection = dataSource.getConnection()) {
             String sql = "INSERT INTO document_slot (id, extension_id, slot_key, content_type, max_size_bytes, " +
-                    "versioning_enabled, max_versions_retained, conflict_strategy, encryption_required, created_at) " +
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                    "versioning_enabled, max_versions_retained, conflict_strategy, created_at) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
             try (PreparedStatement ps = connection.prepareStatement(sql)) {
                 ps.setObject(1, UUID.randomUUID());
                 ps.setObject(2, extensionId);
@@ -227,8 +227,7 @@ class AssetDataDelegateTest extends AbstractIntegrationTest {
                 ps.setBoolean(6, false);
                 ps.setInt(7, 1);
                 ps.setString(8, "LAST_WRITE_WINS");
-                ps.setBoolean(9, false);
-                ps.setTimestamp(10, java.sql.Timestamp.from(Instant.now()));
+                ps.setTimestamp(9, java.sql.Timestamp.from(Instant.now()));
                 ps.executeUpdate();
             }
         }

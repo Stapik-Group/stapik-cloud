@@ -23,7 +23,6 @@
   "slots.default": "default",
   "slots.maxVersionsRetained": "Max retained versions",
   "slots.versioning": "Versioning",
-  "slots.encryption": "Hashing",
   "slots.submit": "Add slot",
   "slots.submitting": "Adding...",
   "slots.createError": "Failed to create slot.",
