@@ -64,6 +64,10 @@ public class AuditingAspect {
 
     private String currentActor() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        return authentication != null ? authentication.getName() : "system";
+        String currentActor = authentication != null ? authentication.getName() : "system";
+        if (currentActor.length() >= 100) {
+            return currentActor.substring(0, 99);
+        }
+        return currentActor;
     }
 }

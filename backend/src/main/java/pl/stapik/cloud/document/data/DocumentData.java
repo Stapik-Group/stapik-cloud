@@ -23,18 +23,27 @@ import java.util.UUID;
 @AllArgsConstructor
 @Builder
 public class DocumentData {
+    public static final String DEFAULT_PARTITION_KEY = "";
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(name = "document_slot_id", nullable = false, unique = true)
+    @Column(name = "document_slot_id", nullable = false)
     private UUID documentSlotId;
+
+    @Column(name = "partition_key", nullable = false)
+    @Builder.Default
+    private String partitionKey = DEFAULT_PARTITION_KEY;
 
     @Column(nullable = false, columnDefinition = "text")
     private String content;
 
     @Column(name = "content_hash", nullable = false)
     private String contentHash;
+
+    @Column(name = "size_bytes", nullable = false)
+    private long sizeBytes;
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;

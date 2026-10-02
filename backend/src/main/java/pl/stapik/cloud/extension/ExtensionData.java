@@ -24,11 +24,6 @@ public class ExtensionData {
     @Column(nullable = false)
     private String displayName;
 
-    @Column
-    private String iconGlyph;
-
-    private String color;
-
     @Column(nullable = false)
     private boolean enabled;
 

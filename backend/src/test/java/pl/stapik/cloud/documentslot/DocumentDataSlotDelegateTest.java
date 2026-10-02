@@ -92,8 +92,19 @@ class DocumentDataSlotDelegateTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.maxSizeBytes").value(1_048_576))
                 .andExpect(jsonPath("$.versioningEnabled").value(true))
                 .andExpect(jsonPath("$.maxVersionsRetained").value(20))
-                .andExpect(jsonPath("$.conflictStrategy").value("LAST_WRITE_WINS_WITH_SHADOW_COPY"))
-                .andExpect(jsonPath("$.encryptionRequired").value(false));
+                .andExpect(jsonPath("$.conflictStrategy").value("LAST_WRITE_WINS_WITH_SHADOW_COPY"));
+    }
+
+    @Test
+    void shouldRejectSlotWithMaxVersionsRetainedBelowOne() throws Exception {
+        // given
+        String requestBody = readResource("fixtures/slots/create-slot-invalid-max-versions-request.json");
+
+        // when & then
+        mockMvc.perform(post("/api/admin/extensions/{extensionId}/slots", extensionId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -140,15 +151,13 @@ class DocumentDataSlotDelegateTest extends AbstractIntegrationTest {
 
     private void insertExtension(UUID id, String slug, String displayName) throws Exception {
         try (Connection connection = dataSource.getConnection()) {
-            String sql = "INSERT INTO extension (id, slug, display_name, icon_glyph, color, enabled, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)";
+            String sql = "INSERT INTO extension (id, slug, display_name, enabled, created_at) VALUES (?, ?, ?, ?, ?)";
             try (PreparedStatement ps = connection.prepareStatement(sql)) {
                 ps.setObject(1, id);
                 ps.setString(2, slug);
                 ps.setString(3, displayName);
-                ps.setString(4, "icon-default");
-                ps.setString(5, "#000000");
-                ps.setBoolean(6, true);
-                ps.setTimestamp(7, java.sql.Timestamp.from(Instant.now()));
+                ps.setBoolean(4, true);
+                ps.setTimestamp(5, java.sql.Timestamp.from(Instant.now()));
                 ps.executeUpdate();
             }
         }
@@ -158,8 +167,8 @@ class DocumentDataSlotDelegateTest extends AbstractIntegrationTest {
         UUID id = UUID.randomUUID();
         try (Connection connection = dataSource.getConnection()) {
             String sql = "INSERT INTO document_slot (id, extension_id, slot_key, content_type, max_size_bytes, " +
-                    "versioning_enabled, max_versions_retained, conflict_strategy, encryption_required, created_at) " +
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                    "versioning_enabled, max_versions_retained, conflict_strategy, created_at) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
             try (PreparedStatement ps = connection.prepareStatement(sql)) {
                 ps.setObject(1, id);
                 ps.setObject(2, extensionId);
@@ -169,8 +178,7 @@ class DocumentDataSlotDelegateTest extends AbstractIntegrationTest {
                 ps.setBoolean(6, true);
                 ps.setInt(7, 20);
                 ps.setString(8, "LAST_WRITE_WINS");
-                ps.setBoolean(9, false);
-                ps.setTimestamp(10, java.sql.Timestamp.from(Instant.now()));
+                ps.setTimestamp(9, java.sql.Timestamp.from(Instant.now()));
                 ps.executeUpdate();
             }
         }

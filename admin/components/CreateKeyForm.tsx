@@ -16,7 +16,6 @@ export function CreateKeyForm({ extensionId }: { extensionId: string }) {
     const { t } = useTranslation();
     const [label, setLabel] = useState("");
     const [scope, setScope] = useState<ApiKeyScope>("READ_WRITE");
-    const [ipAllowlist, setIpAllowlist] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [createdKey, setCreatedKey] = useState<ApiKeyCreatedResponse | null>(null);
@@ -29,7 +28,6 @@ export function CreateKeyForm({ extensionId }: { extensionId: string }) {
         const payload: CreateApiKeyRequest = {
             label,
             scope,
-            ...(ipAllowlist ? { ipAllowlist } : {}),
         };
 
         try {
@@ -54,7 +52,6 @@ export function CreateKeyForm({ extensionId }: { extensionId: string }) {
     function handleClose() {
         setCreatedKey(null);
         setLabel("");
-        setIpAllowlist("");
         router.refresh();
     }
 
@@ -118,20 +115,6 @@ export function CreateKeyForm({ extensionId }: { extensionId: string }) {
                             </option>
                         ))}
                     </select>
-                </div>
-
-                <div className="space-y-1 sm:col-span-2">
-                    <label htmlFor="ipAllowlist" className="text-sm text-text-muted">
-                        {t("apiKeys.ipAllowlist")}
-                    </label>
-                    <input
-                        id="ipAllowlist"
-                        type="text"
-                        value={ipAllowlist}
-                        onChange={(e) => setIpAllowlist(e.target.value)}
-                        className="input w-full"
-                        placeholder="100.64.0.0/10"
-                    />
                 </div>
             </div>
 

@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pl.stapik.cloud.audit.Auditing;
 import pl.stapik.cloud.audit.data.AuditAction;
+import pl.stapik.cloud.document.DocumentModifiedException;
 import pl.stapik.cloud.document.DocumentRepository;
 import pl.stapik.cloud.document.DocumentService;
 import pl.stapik.cloud.document.DocumentVersionRepository;
@@ -14,6 +15,7 @@ import pl.stapik.cloud.document.data.DocumentData;
 import pl.stapik.cloud.document.data.DocumentVersionData;
 import pl.stapik.cloud.document.data.VersionReason;
 import pl.stapik.cloud.document.dto.DocumentIdentifier;
+import pl.stapik.cloud.document.dto.DocumentPartitionSummary;
 import pl.stapik.cloud.document.dto.WriteResult;
 import pl.stapik.cloud.documentslot.data.ConflictStrategy;
 import pl.stapik.cloud.documentslot.data.DocumentSlotData;
@@ -41,13 +43,13 @@ public class DocumentServiceImpl implements DocumentService {
     @Override
     public DocumentData getCurrent(DocumentIdentifier identifier) {
         DocumentSlotData slot = requireSlot(identifier);
-        return requireCurrentDocument(slot);
+        return requireCurrentDocument(slot, identifier);
     }
 
     @Override
     public List<DocumentVersionData> listVersions(DocumentIdentifier identifier) {
         DocumentSlotData slot = requireSlot(identifier);
-        DocumentData documentData = requireCurrentDocument(slot);
+        DocumentData documentData = requireCurrentDocument(slot, identifier);
         return documentVersionRepository.findByDocumentIdOrderBySavedAtDesc(documentData.getId());
     }
 
@@ -55,15 +57,16 @@ public class DocumentServiceImpl implements DocumentService {
     @Override
     public WriteResult write(DocumentIdentifier identifier, String content, Instant clientLastKnownUpdate) {
         DocumentSlotData slot = requireSlot(identifier);
-        Optional<DocumentData> rawExisting = documentRepository.findByDocumentSlotId(slot.getId());
+        Optional<DocumentData> rawExisting = documentRepository
+                .findByDocumentSlotIdAndPartitionKey(slot.getId(), identifier.getPartitionKey());
         Optional<DocumentData> activeExisting = rawExisting.filter(doc -> doc.getDeletedAt() == null);
 
         if (activeExisting.isEmpty()) {
             DocumentData documentData = rawExisting
                     .map(deleted -> applyContent(deleted, content))
-                    .orElseGet(() -> createDocument(slot.getId(), content));
+                    .orElseGet(() -> createDocument(slot.getId(), identifier.getPartitionKey(), content));
 
-            saveVersion(documentData.getId(), content, VersionReason.NORMAL_WRITE);
+            saveVersion(slot, documentData.getId(), content, VersionReason.NORMAL_WRITE);
             return new WriteResult(documentData, false);
         }
 
@@ -73,13 +76,13 @@ public class DocumentServiceImpl implements DocumentService {
 
         if (!decision.writeAccepted()) {
             if (decision.preserveDiscardedVersion()) {
-                saveVersion(existing.getId(), content, VersionReason.CONFLICT_DISCARDED);
+                saveVersion(slot, existing.getId(), content, VersionReason.CONFLICT_DISCARDED);
             }
             return new WriteResult(existing, true);
         }
 
         DocumentData saved = applyContent(existing, content);
-        saveVersion(saved.getId(), content, VersionReason.NORMAL_WRITE);
+        saveVersion(slot, saved.getId(), content, VersionReason.NORMAL_WRITE);
         return new WriteResult(saved, false);
     }
 
@@ -88,31 +91,55 @@ public class DocumentServiceImpl implements DocumentService {
     @Auditing(action = AuditAction.DOCUMENT_VERSION_RESTORED)
     public DocumentData restoreVersion(DocumentIdentifier identifier, UUID versionId) {
         DocumentSlotData slot = requireSlot(identifier);
-        DocumentData documentData = requireCurrentDocument(slot);
+        DocumentData documentData = requireCurrentDocument(slot, identifier);
 
         DocumentVersionData version = documentVersionRepository.findById(versionId)
                 .filter(v -> v.getDocumentId().equals(documentData.getId()))
                 .orElseThrow(() -> new NoSuchElementException("Version not found: " + versionId));
 
         DocumentData saved = applyContent(documentData, version.getContent());
-        saveVersion(saved.getId(), version.getContent(), VersionReason.MANUAL_RESTORE);
+        saveVersion(slot, saved.getId(), version.getContent(), VersionReason.MANUAL_RESTORE);
         return saved;
+    }
+
+    @Transactional
+    @Override
+    @Auditing(action = AuditAction.DOCUMENT_CONTENT_EDITED)
+    public DocumentData updateContent(DocumentIdentifier identifier, String content, Instant clientLastKnownUpdate) {
+        DocumentSlotData slot = requireSlot(identifier);
+        DocumentData existing = requireCurrentDocument(slot, identifier);
+
+        if (clientLastKnownUpdate.isBefore(existing.getUpdatedAt())) {
+            throw new DocumentModifiedException(slot.getSlotKey());
+        }
+
+        DocumentData saved = applyContent(existing, content);
+        saveVersion(slot, saved.getId(), content, VersionReason.NORMAL_WRITE);
+        return saved;
+    }
+
+    @Override
+    public List<DocumentPartitionSummary> listPartitions(DocumentIdentifier identifier) {
+        DocumentSlotData slot = requireSlot(identifier);
+        return documentRepository.findPartitionSummaries(slot.getId());
     }
 
     @Transactional
     @Override
     public void delete(DocumentIdentifier identifier) {
         DocumentSlotData slot = requireSlot(identifier);
-        DocumentData documentData = requireCurrentDocument(slot);
+        DocumentData documentData = requireCurrentDocument(slot, identifier);
         documentData.setDeletedAt(Instant.now());
         documentRepository.save(documentData);
     }
 
-    private DocumentData createDocument(UUID slotId, String content) {
+    private DocumentData createDocument(UUID slotId, String partitionKey, String content) {
         DocumentData documentData = DocumentData.builder()
                 .documentSlotId(slotId)
+                .partitionKey(partitionKey)
                 .content(content)
                 .contentHash(hash(content))
+                .sizeBytes(sizeInBytes(content))
                 .updatedAt(Instant.now())
                 .build();
 
@@ -122,12 +149,13 @@ public class DocumentServiceImpl implements DocumentService {
     private DocumentData applyContent(DocumentData documentData, String content) {
         documentData.setContent(content);
         documentData.setContentHash(hash(content));
+        documentData.setSizeBytes(sizeInBytes(content));
         documentData.setUpdatedAt(Instant.now());
         documentData.setDeletedAt(null);
         return documentRepository.save(documentData);
     }
 
-    private void saveVersion(UUID documentId, String content, VersionReason reason) {
+    private void saveVersion(DocumentSlotData slot, UUID documentId, String content, VersionReason reason) {
         DocumentVersionData version = DocumentVersionData.builder()
                 .documentId(documentId)
                 .content(content)
@@ -136,12 +164,19 @@ public class DocumentServiceImpl implements DocumentService {
                 .build();
 
         documentVersionRepository.save(version);
+        documentVersionRepository.deleteAllExceptNewest(documentId, slot.getMaxVersionsRetained());
     }
 
-    private DocumentData requireCurrentDocument(DocumentSlotData slot) {
-        return documentRepository.findByDocumentSlotId(slot.getId())
+    private DocumentData requireCurrentDocument(DocumentSlotData slot, DocumentIdentifier identifier) {
+        return documentRepository.findByDocumentSlotIdAndPartitionKey(slot.getId(), identifier.getPartitionKey())
                 .filter(doc -> doc.getDeletedAt() == null)
-                .orElseThrow(() -> new NoSuchElementException("Document not found for slot: " + slot.getSlotKey()));
+                .orElseThrow(() -> new NoSuchElementException(documentNotFoundMessage(slot, identifier)));
+    }
+
+    private String documentNotFoundMessage(DocumentSlotData slot, DocumentIdentifier identifier) {
+        String message = "Document not found for slot: " + slot.getSlotKey();
+        boolean isDefaultPartition = DocumentData.DEFAULT_PARTITION_KEY.equals(identifier.getPartitionKey());
+        return isDefaultPartition ? message : message + ", partition: " + identifier.getPartitionKey();
     }
 
     private DocumentSlotData requireSlot(DocumentIdentifier identifier) {
@@ -154,6 +189,10 @@ public class DocumentServiceImpl implements DocumentService {
                 .filter(resolver -> resolver.supports() == strategy)
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("No ConflictResolver for strategy: " + strategy));
+    }
+
+    private long sizeInBytes(String content) {
+        return content.getBytes(StandardCharsets.UTF_8).length;
     }
 
     private String hash(String content) {

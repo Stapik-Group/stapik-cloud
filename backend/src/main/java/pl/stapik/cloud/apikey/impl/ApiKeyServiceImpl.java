@@ -54,7 +54,6 @@ public class ApiKeyServiceImpl implements ApiKeyService {
                 .keyPrefix(generated.prefix())
                 .hashedKey(hashingService.hash(generated.rawKey()))
                 .scope(createApiKeyInfo.getScope())
-                .ipAllowlist(createApiKeyInfo.getIpAllowlist())
                 .expiresAt(createApiKeyInfo.getExpiresAt())
                 .revoked(false)
                 .createdAt(Instant.now(clock))

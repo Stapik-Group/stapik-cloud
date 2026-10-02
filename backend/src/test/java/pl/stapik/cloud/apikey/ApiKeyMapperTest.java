@@ -41,7 +41,6 @@ class ApiKeyMapperTest {
         entity.setId(id);
         entity.setLabel("Test Label");
         entity.setScope(pl.stapik.cloud.apikey.data.ApiKeyScope.READ_ONLY);
-        entity.setIpAllowlist("192.168.1.1");
         entity.setLastUsedAt(createdAt);
         entity.setCreatedAt(createdAt);
         entity.setRevoked(false);
@@ -54,7 +53,6 @@ class ApiKeyMapperTest {
         assertThat(response.getId()).isEqualTo(id);
         assertThat(response.getLabel()).isEqualTo("Test Label");
         assertThat(response.getScope()).isEqualTo(ApiKeyScope.ONLY);
-        assertThat(response.getIpAllowlist()).isEqualTo(JsonNullable.of("192.168.1.1"));
         assertThat(response.getLastUsedAt()).isEqualTo(JsonNullable.of(createdAt.atOffset(ZoneOffset.UTC)));
     }
 

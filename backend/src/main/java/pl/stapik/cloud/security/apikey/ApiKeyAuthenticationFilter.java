@@ -7,7 +7,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import pl.stapik.cloud.apikey.data.ApiKeyData;
 import pl.stapik.cloud.apikey.ApiKeyRepository;
@@ -17,7 +16,6 @@ import pl.stapik.cloud.common.crypto.HashingService;
 import java.io.IOException;
 import java.time.Instant;
 
-@Component
 @RequiredArgsConstructor
 public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
 
@@ -38,7 +36,6 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
             apiKeyRepository.findByKeyPrefixAndRevokedFalse(prefix)
                     .filter(apiKey -> hashingService.matches(rawKey, apiKey.getHashedKey()))
                     .filter(this::notExpired)
-                    .filter(apiKey -> isAllowedIp(apiKey, request.getRemoteAddr()))
                     .ifPresent(this::authenticate);
         }
 
@@ -47,11 +44,6 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
 
     private boolean notExpired(ApiKeyData apiKey) {
         return apiKey.getExpiresAt() == null || apiKey.getExpiresAt().isAfter(Instant.now());
-    }
-
-    private boolean isAllowedIp(ApiKeyData apiKey, String remoteAddr) {
-        String allowlist = apiKey.getIpAllowlist();
-        return allowlist == null || allowlist.isBlank() || CidrMatcher.matches(allowlist, remoteAddr);
     }
 
     private void authenticate(ApiKeyData apiKey) {

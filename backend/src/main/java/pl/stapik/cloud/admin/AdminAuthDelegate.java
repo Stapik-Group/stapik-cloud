@@ -9,8 +9,9 @@ import pl.stapik.cloud.admin.api.AuthApiDelegate;
 import pl.stapik.cloud.admin.data.AdminUserData;
 import pl.stapik.cloud.admin.data.LoginRequest;
 import pl.stapik.cloud.admin.data.LoginResponse;
+import pl.stapik.cloud.admin.data.RefreshTokenRequest;
+import pl.stapik.cloud.admin.dto.AdminSession;
 import pl.stapik.cloud.admin.dto.Credentials;
-import pl.stapik.cloud.security.admin.JwtService;
 
 import java.time.ZoneOffset;
 
@@ -19,16 +20,33 @@ import java.time.ZoneOffset;
 public class AdminAuthDelegate implements AuthApiDelegate {
 
     private final AdminUserService adminUserService;
-    private final JwtService jwtService;
+    private final AdminSessionService adminSessionService;
 
     @Override
     public ResponseEntity<LoginResponse> login(LoginRequest loginRequest) {
         AdminUserData adminUser = getAdminUserData(loginRequest);
-        String token = jwtService.generateToken(adminUser.getId(), adminUser.getUsername(), adminUser.getRole());
+        return ResponseEntity.ok(toLoginResponse(adminSessionService.startSession(adminUser)));
+    }
 
-        return ResponseEntity.ok(new LoginResponse()
-                .token(token)
-                .expiresAt(jwtService.expirationOf(token).atOffset(ZoneOffset.UTC)));
+    @Override
+    public ResponseEntity<LoginResponse> refreshToken(RefreshTokenRequest refreshTokenRequest) {
+        AdminSession session = adminSessionService.refreshSession(refreshTokenRequest.getRefreshToken())
+                .orElseThrow(() -> new BadCredentialsException("Invalid refresh token"));
+        return ResponseEntity.ok(toLoginResponse(session));
+    }
+
+    @Override
+    public ResponseEntity<Void> logout(RefreshTokenRequest refreshTokenRequest) {
+        adminSessionService.endSession(refreshTokenRequest.getRefreshToken());
+        return ResponseEntity.noContent().build();
+    }
+
+    private LoginResponse toLoginResponse(AdminSession session) {
+        return new LoginResponse()
+                .token(session.accessToken())
+                .expiresAt(session.accessTokenExpiresAt().atOffset(ZoneOffset.UTC))
+                .refreshToken(session.refreshToken())
+                .refreshExpiresAt(session.refreshTokenExpiresAt().atOffset(ZoneOffset.UTC));
     }
 
     private @NonNull AdminUserData getAdminUserData(LoginRequest loginRequest) {

@@ -129,7 +129,6 @@ class AssetDataRepositoryIT extends AbstractIntegrationTest {
                 .versioningEnabled(true)
                 .maxVersionsRetained(20)
                 .conflictStrategy(ConflictStrategy.LAST_WRITE_WINS)
-                .encryptionRequired(false)
                 .createdAt(Instant.now())
                 .build();
         return documentSlotRepository.save(slot);

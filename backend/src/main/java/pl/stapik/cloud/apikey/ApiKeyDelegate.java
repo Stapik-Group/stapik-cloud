@@ -37,7 +37,6 @@ public class ApiKeyDelegate implements KeysApiDelegate {
     @Override
     public ResponseEntity<ApiKeyCreatedResponse> createApiKey(UUID extensionId, CreateApiKeyRequest createApiKeyRequest) {
         ApiKeyScope scope = ApiKeyScope.fromValue(createApiKeyRequest.getScope().name());
-        String ipAllowlist = createApiKeyRequest.getIpAllowlist().orElse(null);
 
         OffsetDateTime expiresAtValue = createApiKeyRequest.getExpiresAt().orElse(null);
         Instant expiresAt = expiresAtValue == null ? null : expiresAtValue.toInstant();
@@ -46,7 +45,6 @@ public class ApiKeyDelegate implements KeysApiDelegate {
                 .extensionId(extensionId)
                 .label(createApiKeyRequest.getLabel())
                 .scope(scope)
-                .ipAllowlist(ipAllowlist)
                 .expiresAt(expiresAt)
                 .build();
 
