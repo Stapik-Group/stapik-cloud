@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 
 const API_BASE_URL = process.env.STAPIK_CLOUD_API_URL ?? "http://localhost:8099";
 const AUTH_COOKIE_NAME = "stapik_admin_token";
+export const REFRESH_COOKIE_NAME = "stapik_admin_refresh_token";
 
 export async function getAuthToken(): Promise<string | undefined> {
     const cookieStore = await cookies();

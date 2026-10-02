@@ -51,6 +51,9 @@ stapik-cloud:
       secret: ${JWT_SECRET}
       expiration-minutes: ${JWT_EXPIRATION_MINUTES:60}
       issuer: stapik-cloud
+    refresh-token:
+      expiration-days: ${JWT_REFRESH_EXPIRATION_DAYS:7}
+      reuse-leeway-seconds: 30
   admin-bootstrap:
     username: ${ADMIN_BOOTSTRAP_USERNAME:}
     password: ${ADMIN_BOOTSTRAP_PASSWORD:}
