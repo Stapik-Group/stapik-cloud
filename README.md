@@ -5,6 +5,7 @@ A self-hosted backend for the Stapik ecosystem of apps — document storage with
 ## Features
 
 - **Document slots** — per-extension key-value document storage (`JSON`, `TEXT`, `BINARY`, `BINARY_COLLECTION`), with configurable versioning and per-slot size limits
+- **Document partitions** — a slot can hold named partitions (e.g. one per year) next to its main document; each partition has its own content, version history and conflict handling, so large documents can be split and old parts fetched on demand
 - **Conflict resolution** — last-write-wins, optionally with a shadow copy preserving the discarded write-in version history
 - **Version history** — every write is recorded; restore any previous version as the current document
 - **Binary assets** — file upload/download/list per document slot, backed by local filesystem storage

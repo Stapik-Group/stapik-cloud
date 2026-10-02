@@ -9,6 +9,8 @@ import pl.stapik.cloud.common.mapper.DateTimeMapper;
 import pl.stapik.cloud.common.mapper.JsonNullableMapper;
 import pl.stapik.cloud.document.data.DocumentData;
 import pl.stapik.cloud.document.data.DocumentVersionData;
+import pl.stapik.cloud.document.dto.DocumentPartitionSummary;
+import pl.stapik.cloud.internal.data.DocumentPartitionResponse;
 import pl.stapik.cloud.internal.data.DocumentResponse;
 import pl.stapik.cloud.internal.data.DocumentVersionResponse;
 
@@ -24,5 +26,7 @@ public interface DocumentMapper {
     @Mapping(target = "updatedAt", source = "document.updatedAt")
     AdminDocumentResponse toAdminDocumentResponse(DocumentData document, String slotKey);
     DocumentVersionResponse toVersionResponse(DocumentVersionData version);
+    @Mapping(target = "partition", source = "partitionKey")
+    DocumentPartitionResponse toPartitionResponse(DocumentPartitionSummary summary);
     AdminDocumentVersionListResponseVersionsInner toAdminVersionResponse(DocumentVersionData documentVersionData);
 }

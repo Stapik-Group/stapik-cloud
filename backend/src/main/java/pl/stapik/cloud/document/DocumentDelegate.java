@@ -10,6 +10,8 @@ import pl.stapik.cloud.document.data.DocumentData;
 import pl.stapik.cloud.document.dto.DocumentIdentifier;
 import pl.stapik.cloud.document.dto.WriteResult;
 import pl.stapik.cloud.internal.api.DocumentsApiDelegate;
+import pl.stapik.cloud.internal.data.DocumentPartitionListResponse;
+import pl.stapik.cloud.internal.data.DocumentPartitionResponse;
 import pl.stapik.cloud.internal.data.DocumentResponse;
 import pl.stapik.cloud.internal.data.DocumentVersionListResponse;
 import pl.stapik.cloud.internal.data.DocumentVersionResponse;
@@ -29,43 +31,97 @@ public class DocumentDelegate implements DocumentsApiDelegate {
 
     @Override
     public ResponseEntity<DocumentResponse> getDocument(String slotKey) {
-        DocumentData documentData = documentService.getCurrent(DocumentIdentifier.of(currentExtensionId(), slotKey));
-        return ResponseEntity.ok(documentMapper.toResponse(documentData, slotKey));
+        return readDocument(DocumentIdentifier.of(currentExtensionId(), slotKey));
+    }
+
+    @Override
+    public ResponseEntity<DocumentResponse> getDocumentPartition(String slotKey, String partition) {
+        return readDocument(DocumentIdentifier.of(currentExtensionId(), slotKey, partition));
     }
 
     @Override
     public ResponseEntity<DocumentResponse> writeDocument(String slotKey, DocumentWriteRequest documentWriteRequest) {
+        return saveDocument(DocumentIdentifier.of(currentExtensionId(), slotKey), documentWriteRequest);
+    }
+
+    @Override
+    public ResponseEntity<DocumentResponse> writeDocumentPartition(String slotKey, String partition, DocumentWriteRequest documentWriteRequest) {
+        return saveDocument(DocumentIdentifier.of(currentExtensionId(), slotKey, partition), documentWriteRequest);
+    }
+
+    @Override
+    public ResponseEntity<Void> deleteDocument(String slotKey) {
+        return removeDocument(DocumentIdentifier.of(currentExtensionId(), slotKey));
+    }
+
+    @Override
+    public ResponseEntity<Void> deleteDocumentPartition(String slotKey, String partition) {
+        return removeDocument(DocumentIdentifier.of(currentExtensionId(), slotKey, partition));
+    }
+
+    @Override
+    public ResponseEntity<DocumentVersionListResponse> listDocumentVersions(String slotKey) {
+        return listVersions(DocumentIdentifier.of(currentExtensionId(), slotKey));
+    }
+
+    @Override
+    public ResponseEntity<DocumentVersionListResponse> listDocumentPartitionVersions(String slotKey, String partition) {
+        return listVersions(DocumentIdentifier.of(currentExtensionId(), slotKey, partition));
+    }
+
+    @Override
+    public ResponseEntity<DocumentResponse> restoreDocumentVersion(String slotKey, UUID versionId) {
+        return restoreVersion(DocumentIdentifier.of(currentExtensionId(), slotKey), versionId);
+    }
+
+    @Override
+    public ResponseEntity<DocumentResponse> restoreDocumentPartitionVersion(String slotKey, String partition, UUID versionId) {
+        return restoreVersion(DocumentIdentifier.of(currentExtensionId(), slotKey, partition), versionId);
+    }
+
+    @Override
+    public ResponseEntity<DocumentPartitionListResponse> listDocumentPartitions(String slotKey) {
+        List<DocumentPartitionResponse> partitions = documentService.listPartitions(DocumentIdentifier.of(currentExtensionId(), slotKey)).stream()
+                .map(documentMapper::toPartitionResponse)
+                .toList();
+
+        return ResponseEntity.ok(new DocumentPartitionListResponse().partitions(partitions));
+    }
+
+    private ResponseEntity<DocumentResponse> readDocument(DocumentIdentifier identifier) {
+        DocumentData documentData = documentService.getCurrent(identifier);
+        return ResponseEntity.ok(documentMapper.toResponse(documentData, identifier.getSlotKey()));
+    }
+
+    private ResponseEntity<DocumentResponse> saveDocument(DocumentIdentifier identifier, DocumentWriteRequest documentWriteRequest) {
         WriteResult result = documentService.write(
-                DocumentIdentifier.of(currentExtensionId(), slotKey),
+                identifier,
                 documentWriteRequest.getContent(),
                 documentWriteRequest.getClientLastKnownUpdate().toInstant()
         );
 
-        DocumentResponse response = documentMapper.toResponse(result.documentData(), slotKey);
+        DocumentResponse response = documentMapper.toResponse(result.documentData(), identifier.getSlotKey());
         return result.conflict()
                 ? ResponseEntity.status(409).body(response)
                 : ResponseEntity.ok(response);
     }
 
-    @Override
-    public ResponseEntity<Void> deleteDocument(String slotKey) {
-        documentService.delete(DocumentIdentifier.of(currentExtensionId(), slotKey));
+    private ResponseEntity<Void> removeDocument(DocumentIdentifier identifier) {
+        documentService.delete(identifier);
         return ResponseEntity.noContent().build();
     }
 
-    @Override
-    public ResponseEntity<DocumentVersionListResponse> listDocumentVersions(String slotKey) {
-        List<DocumentVersionResponse> versions = documentService.listVersions(DocumentIdentifier.of(currentExtensionId(), slotKey)).stream()
+    private ResponseEntity<DocumentVersionListResponse> listVersions(DocumentIdentifier identifier) {
+        List<DocumentVersionResponse> versions = documentService.listVersions(identifier).stream()
                 .map(documentMapper::toVersionResponse)
                 .toList();
 
         return ResponseEntity.ok(new DocumentVersionListResponse().versions(versions));
     }
 
-    @Override
-    public ResponseEntity<DocumentResponse> restoreDocumentVersion(String slotKey, UUID versionId) {
-        DocumentData restored = documentService.restoreVersion(DocumentIdentifier.of(currentExtensionId(), slotKey), versionId);
-        return ResponseEntity.ok(documentMapper.toResponse(restored, slotKey));
+    private ResponseEntity<DocumentResponse> restoreVersion(DocumentIdentifier identifier, UUID versionId) {
+        DocumentData restored = documentService.restoreVersion(identifier, versionId);
+        return ResponseEntity.ok(documentMapper.toResponse(restored, identifier.getSlotKey()));
     }
 
     private UUID currentExtensionId() {

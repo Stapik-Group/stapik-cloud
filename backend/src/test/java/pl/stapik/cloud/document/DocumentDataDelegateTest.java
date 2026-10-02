@@ -1,5 +1,6 @@
 package pl.stapik.cloud.document;
 
+import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -8,6 +9,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import pl.stapik.cloud.AbstractIntegrationTest;
 
 import javax.sql.DataSource;
@@ -238,6 +240,161 @@ class DocumentDataDelegateTest extends AbstractIntegrationTest {
                         "restore-missing-slot", UUID.randomUUID())
                         .header(API_KEY_HEADER, rawApiKey))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldWriteAndReadPartitionIndependentlyFromMainDocument() throws Exception {
+        // given
+        insertDocumentSlot(UUID.randomUUID(), extensionId, "calendar.json");
+
+        // when
+        putDocument("/api/v1/documents/{slotKey}", "main content", "calendar.json");
+        putDocument("/api/v1/documents/{slotKey}/partitions/{partition}", "content of 2024", "calendar.json", "2024");
+
+        // then
+        mockMvc.perform(get("/api/v1/documents/{slotKey}", "calendar.json").header(API_KEY_HEADER, rawApiKey))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").value("main content"));
+        mockMvc.perform(get("/api/v1/documents/{slotKey}/partitions/{partition}", "calendar.json", "2024")
+                        .header(API_KEY_HEADER, rawApiKey))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.slotKey").value("calendar.json"))
+                .andExpect(jsonPath("$.content").value("content of 2024"));
+    }
+
+    @Test
+    void shouldListPartitionsWithoutMainDocument() throws Exception {
+        // given
+        insertDocumentSlot(UUID.randomUUID(), extensionId, "calendar.json");
+        putDocument("/api/v1/documents/{slotKey}", "main content", "calendar.json");
+        putDocument("/api/v1/documents/{slotKey}/partitions/{partition}", "year 2024", "calendar.json", "2024");
+        putDocument("/api/v1/documents/{slotKey}/partitions/{partition}", "zażółć 2023", "calendar.json", "2023");
+
+        // when & then
+        mockMvc.perform(get("/api/v1/documents/{slotKey}/partitions", "calendar.json")
+                        .header(API_KEY_HEADER, rawApiKey))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.partitions.length()").value(2))
+                .andExpect(jsonPath("$.partitions[0].partition").value("2023"))
+                .andExpect(jsonPath("$.partitions[0].sizeBytes").value("zażółć 2023".getBytes(java.nio.charset.StandardCharsets.UTF_8).length))
+                .andExpect(jsonPath("$.partitions[0].contentHash").isNotEmpty())
+                .andExpect(jsonPath("$.partitions[0].updatedAt").isNotEmpty())
+                .andExpect(jsonPath("$.partitions[1].partition").value("2024"));
+    }
+
+    @Test
+    void shouldReturnEmptyPartitionListForSlotWithoutPartitions() throws Exception {
+        // given
+        insertDocumentSlot(UUID.randomUUID(), extensionId, "calendar.json");
+
+        // when & then
+        mockMvc.perform(get("/api/v1/documents/{slotKey}/partitions", "calendar.json")
+                        .header(API_KEY_HEADER, rawApiKey))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.partitions.length()").value(0));
+    }
+
+    @Test
+    void shouldReturnNotFoundWhenListingPartitionsForMissingSlot() throws Exception {
+        // when & then
+        mockMvc.perform(get("/api/v1/documents/{slotKey}/partitions", "missing-slot")
+                        .header(API_KEY_HEADER, rawApiKey))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldReturnNotFoundForMissingPartition() throws Exception {
+        // given
+        insertDocumentSlot(UUID.randomUUID(), extensionId, "calendar.json");
+
+        // when & then
+        mockMvc.perform(get("/api/v1/documents/{slotKey}/partitions/{partition}", "calendar.json", "2020")
+                        .header(API_KEY_HEADER, rawApiKey))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldReturnBadRequestForInvalidPartitionKey() throws Exception {
+        // given
+        insertDocumentSlot(UUID.randomUUID(), extensionId, "calendar.json");
+
+        // when & then
+        mockMvc.perform(get("/api/v1/documents/{slotKey}/partitions/{partition}", "calendar.json", "-invalid")
+                        .header(API_KEY_HEADER, rawApiKey))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldKeepVersionHistoryPerPartition() throws Exception {
+        // given
+        insertDocumentSlot(UUID.randomUUID(), extensionId, "calendar.json");
+
+        // when
+        putDocument("/api/v1/documents/{slotKey}", "main content", "calendar.json");
+        putDocument("/api/v1/documents/{slotKey}/partitions/{partition}", "first", "calendar.json", "2024");
+        putDocument("/api/v1/documents/{slotKey}/partitions/{partition}", "second", "calendar.json", "2024");
+
+        // then
+        mockMvc.perform(get("/api/v1/documents/{slotKey}/versions", "calendar.json").header(API_KEY_HEADER, rawApiKey))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.versions.length()").value(1));
+        mockMvc.perform(get("/api/v1/documents/{slotKey}/partitions/{partition}/versions", "calendar.json", "2024")
+                        .header(API_KEY_HEADER, rawApiKey))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.versions.length()").value(2));
+    }
+
+    @Test
+    void shouldRestorePartitionVersion() throws Exception {
+        // given
+        insertDocumentSlot(UUID.randomUUID(), extensionId, "calendar.json");
+        putDocument("/api/v1/documents/{slotKey}/partitions/{partition}", "first", "calendar.json", "2024");
+        putDocument("/api/v1/documents/{slotKey}/partitions/{partition}", "second", "calendar.json", "2024");
+
+        MvcResult versionsResult = mockMvc.perform(get("/api/v1/documents/{slotKey}/partitions/{partition}/versions", "calendar.json", "2024")
+                        .header(API_KEY_HEADER, rawApiKey))
+                .andExpect(status().isOk())
+                .andReturn();
+        String firstVersionId = JsonPath.read(versionsResult.getResponse().getContentAsString(), "$.versions[1].id");
+
+        // when & then
+        mockMvc.perform(post("/api/v1/documents/{slotKey}/partitions/{partition}/versions/{versionId}/restore",
+                        "calendar.json", "2024", firstVersionId)
+                        .header(API_KEY_HEADER, rawApiKey))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").value("first"));
+    }
+
+    @Test
+    void shouldDeletePartitionWithoutTouchingMainDocument() throws Exception {
+        // given
+        insertDocumentSlot(UUID.randomUUID(), extensionId, "calendar.json");
+        putDocument("/api/v1/documents/{slotKey}", "main content", "calendar.json");
+        putDocument("/api/v1/documents/{slotKey}/partitions/{partition}", "year 2024", "calendar.json", "2024");
+
+        // when
+        mockMvc.perform(delete("/api/v1/documents/{slotKey}/partitions/{partition}", "calendar.json", "2024")
+                        .header(API_KEY_HEADER, rawApiKey))
+                .andExpect(status().isNoContent());
+
+        // then
+        mockMvc.perform(get("/api/v1/documents/{slotKey}/partitions/{partition}", "calendar.json", "2024")
+                        .header(API_KEY_HEADER, rawApiKey))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/v1/documents/{slotKey}/partitions", "calendar.json").header(API_KEY_HEADER, rawApiKey))
+                .andExpect(jsonPath("$.partitions.length()").value(0));
+        mockMvc.perform(get("/api/v1/documents/{slotKey}", "calendar.json").header(API_KEY_HEADER, rawApiKey))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").value("main content"));
+    }
+
+    private void putDocument(String urlTemplate, String content, Object... urlVariables) throws Exception {
+        String requestBody = "{\"content\": \"" + content + "\", \"clientLastKnownUpdate\": \"2999-01-01T00:00:00Z\"}";
+        mockMvc.perform(put(urlTemplate, urlVariables)
+                        .header(API_KEY_HEADER, rawApiKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isOk());
     }
 
     private void insertExtension(UUID id) throws Exception {

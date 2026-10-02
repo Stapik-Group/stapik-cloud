@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Stapik Cloud - Application API
-  version: 1.0.0
+  version: 1.0.1
   description: >
     API used by Stapik ecosystem client applications (desktop C++/GTK4, Android) to
     sync documents and binary assets. Authentication: x-api-key header, a key is
@@ -89,6 +89,180 @@ paths:
               schema:
                 $ref: 'common/error.yaml#/components/schemas/Problem'
 
+
+  /documents/{slotKey}/partitions:
+    get:
+      operationId: listDocumentPartitions
+      tags: [documents]
+      summary: List the named partitions of a document slot (e.g. archived years)
+      description: >
+        A partition is an independent document inside the same slot, with its own content,
+        version history and conflict resolution. The main document of the slot is not listed.
+      parameters:
+        - $ref: '#/components/parameters/SlotKeyParam'
+      responses:
+        '200':
+          description: Existing partitions, sorted by key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentPartitionListResponse'
+        '404':
+          description: Document slot not found
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+
+  /documents/{slotKey}/partitions/{partition}:
+    get:
+      operationId: getDocumentPartition
+      tags: [documents]
+      summary: Get the current content of a partition
+      parameters:
+        - $ref: '#/components/parameters/SlotKeyParam'
+        - $ref: '#/components/parameters/PartitionParam'
+      responses:
+        '200':
+          description: Current partition content
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        '400':
+          description: Invalid partition key
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+        '404':
+          description: Document slot or partition not found
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+    put:
+      operationId: writeDocumentPartition
+      tags: [documents]
+      summary: Write partition content (created on first write, same conflict handling as the main document)
+      parameters:
+        - $ref: '#/components/parameters/SlotKeyParam'
+        - $ref: '#/components/parameters/PartitionParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentWriteRequest'
+      responses:
+        '200':
+          description: Saved, returns the current state after the write
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        '400':
+          description: Invalid partition key
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+        '404':
+          description: Document slot not found
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+        '409':
+          description: The write lost against a newer copy in the cloud (see writeDocument)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+    delete:
+      operationId: deleteDocumentPartition
+      tags: [documents]
+      summary: Delete a partition (soft-delete, keeps version history)
+      parameters:
+        - $ref: '#/components/parameters/SlotKeyParam'
+        - $ref: '#/components/parameters/PartitionParam'
+      responses:
+        '204':
+          description: Deleted
+        '400':
+          description: Invalid partition key
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+        '404':
+          description: Document slot or partition not found
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+
+  /documents/{slotKey}/partitions/{partition}/versions:
+    get:
+      operationId: listDocumentPartitionVersions
+      tags: [documents]
+      summary: List historical versions of a partition
+      parameters:
+        - $ref: '#/components/parameters/SlotKeyParam'
+        - $ref: '#/components/parameters/PartitionParam'
+      responses:
+        '200':
+          description: List of versions, newest first
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentVersionListResponse'
+        '400':
+          description: Invalid partition key
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+        '404':
+          description: Document slot or partition not found
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+
+  /documents/{slotKey}/partitions/{partition}/versions/{versionId}/restore:
+    post:
+      operationId: restoreDocumentPartitionVersion
+      tags: [documents]
+      summary: Restore the given version as the current partition content
+      parameters:
+        - $ref: '#/components/parameters/SlotKeyParam'
+        - $ref: '#/components/parameters/PartitionParam'
+        - name: versionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Restored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        '400':
+          description: Invalid partition key
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+        '404':
+          description: Document slot, partition or version not found
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
 
   /documents/{slotKey}/versions:
     get:
@@ -275,6 +449,16 @@ components:
       required: true
       schema:
         type: string
+    PartitionParam:
+      name: partition
+      in: path
+      required: true
+      description: >
+        Partition key, e.g. a year ("2024"). Letters, digits, '.', '_' and '-', up to 100 characters,
+        starting with a letter or digit.
+      schema:
+        type: string
+      example: "2024"
     FilenameParam:
       name: filename
       in: path
@@ -340,6 +524,30 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/DocumentVersionResponse'
+
+    DocumentPartitionResponse:
+      type: object
+      required: [partition, sizeBytes, contentHash, updatedAt]
+      properties:
+        partition:
+          type: string
+        sizeBytes:
+          type: integer
+          format: int64
+        contentHash:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+
+    DocumentPartitionListResponse:
+      type: object
+      required: [partitions]
+      properties:
+        partitions:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentPartitionResponse'
 
     AssetMetadataResponse:
       type: object
