@@ -74,7 +74,7 @@ class SecurityE2ETest extends AbstractIntegrationTest {
 
     @Test
     void meWithValidApiKeyReturnsPrincipal() throws Exception {
-        String rawKey = insertApiKey(extensionId, "desktop-key", "READ_WRITE", null, null, false);
+        String rawKey = insertApiKey(extensionId, "desktop-key", "READ_WRITE", null, false);
 
         mockMvc.perform(get("/api/v1/me").header("x-api-key", rawKey))
                 .andExpect(status().isOk())
@@ -85,7 +85,7 @@ class SecurityE2ETest extends AbstractIntegrationTest {
 
     @Test
     void meWithValidApiKeyAndBearerTokenAuthenticatesByApiKey() throws Exception {
-        String rawKey = insertApiKey(extensionId, "desktop-key", "READ_WRITE", null, null, false);
+        String rawKey = insertApiKey(extensionId, "desktop-key", "READ_WRITE", null, false);
         String adminToken = jwtService.generateToken(UUID.randomUUID(), "security-admin-5", "OWNER");
 
         mockMvc.perform(get("/api/v1/me")
@@ -98,7 +98,7 @@ class SecurityE2ETest extends AbstractIntegrationTest {
 
     @Test
     void meWithRevokedApiKeyIsRejected() throws Exception {
-        String rawKey = insertApiKey(extensionId, "revoked-key", "READ_ONLY", null, null, true);
+        String rawKey = insertApiKey(extensionId, "revoked-key", "READ_ONLY", null, true);
 
         mockMvc.perform(get("/api/v1/me").header("x-api-key", rawKey))
                 .andExpect(status().isUnauthorized());
@@ -106,26 +106,10 @@ class SecurityE2ETest extends AbstractIntegrationTest {
 
     @Test
     void meWithExpiredApiKeyIsRejected() throws Exception {
-        String rawKey = insertApiKey(extensionId, "expired-key", "READ_ONLY", null, Instant.now().minus(1, ChronoUnit.DAYS), false);
+        String rawKey = insertApiKey(extensionId, "expired-key", "READ_ONLY", Instant.now().minus(1, ChronoUnit.DAYS), false);
 
         mockMvc.perform(get("/api/v1/me").header("x-api-key", rawKey))
                 .andExpect(status().isUnauthorized());
-    }
-
-    @Test
-    void meWithApiKeyOutsideIpAllowlistIsRejected() throws Exception {
-        String rawKey = insertApiKey(extensionId, "cidr-key", "READ_ONLY", "10.0.0.0/8", null, false);
-
-        mockMvc.perform(get("/api/v1/me").header("x-api-key", rawKey))
-                .andExpect(status().isUnauthorized());
-    }
-
-    @Test
-    void meWithApiKeyInsideIpAllowlistSucceeds() throws Exception {
-        String rawKey = insertApiKey(extensionId, "cidr-key-ok", "READ_ONLY", "127.0.0.1/32", null, false);
-
-        mockMvc.perform(get("/api/v1/me").header("x-api-key", rawKey))
-                .andExpect(status().isOk());
     }
 
     @Test
@@ -231,14 +215,14 @@ class SecurityE2ETest extends AbstractIntegrationTest {
         }
     }
 
-    private String insertApiKey(UUID extId, String label, String scope, String ipAllowlist, Instant expiresAt, boolean revoked) throws Exception {
+    private String insertApiKey(UUID extId, String label, String scope, Instant expiresAt, boolean revoked) throws Exception {
         String rawKey = "prefix_" + UUID.randomUUID();
         String prefix = rawKey.substring(0, 8);
         String hashedKey = hashingService.hash(rawKey);
 
         try (Connection connection = dataSource.getConnection()) {
-            String sql = "INSERT INTO api_key (id, extension_id, label, key_prefix, hashed_key, scope, ip_allowlist, expires_at, revoked, created_at) " +
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            String sql = "INSERT INTO api_key (id, extension_id, label, key_prefix, hashed_key, scope, expires_at, revoked, created_at) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
             try (PreparedStatement ps = connection.prepareStatement(sql)) {
                 ps.setObject(1, UUID.randomUUID());
                 ps.setObject(2, extId);
@@ -246,14 +230,13 @@ class SecurityE2ETest extends AbstractIntegrationTest {
                 ps.setString(4, prefix);
                 ps.setString(5, hashedKey);
                 ps.setString(6, scope);
-                ps.setString(7, ipAllowlist);
                 if (expiresAt != null) {
-                    ps.setTimestamp(8, Timestamp.from(expiresAt));
+                    ps.setTimestamp(7, Timestamp.from(expiresAt));
                 } else {
-                    ps.setNull(8, Types.TIMESTAMP_WITH_TIMEZONE);
+                    ps.setNull(7, Types.TIMESTAMP_WITH_TIMEZONE);
                 }
-                ps.setBoolean(9, revoked);
-                ps.setTimestamp(10, Timestamp.from(Instant.now()));
+                ps.setBoolean(8, revoked);
+                ps.setTimestamp(9, Timestamp.from(Instant.now()));
                 ps.executeUpdate();
             }
         }

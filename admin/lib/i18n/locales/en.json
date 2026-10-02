@@ -63,7 +63,6 @@
   "apiKeys.newKey": "New key",
   "apiKeys.label": "Label (device)",
   "apiKeys.scope": "Scope",
-  "apiKeys.ipAllowlist": "IP allowlist (optional, CIDR)",
   "apiKeys.submit": "Generate key",
   "apiKeys.submitting": "Creating...",
   "extensionDetail.deleteConfirm": "Delete this extension along with all its slots, keys and data? This action cannot be undone.",

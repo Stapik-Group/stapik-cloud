@@ -63,7 +63,6 @@
   "apiKeys.newKey": "Neuer Schlüssel",
   "apiKeys.label": "Bezeichnung (Gerät)",
   "apiKeys.scope": "Bereich",
-  "apiKeys.ipAllowlist": "IP-Zulassungsliste (optional, CIDR)",
   "apiKeys.submit": "Schlüssel generieren",
   "apiKeys.submitting": "Wird erstellt...",
   "extensionDetail.deleteConfirm": "Diese Erweiterung samt allen Slots, Schlüsseln und Daten löschen? Diese Aktion kann nicht rückgängig gemacht werden.",

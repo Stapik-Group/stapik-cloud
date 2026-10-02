@@ -586,10 +586,6 @@ components:
           example: desktop-laptop
         scope:
           $ref: '#/components/schemas/ApiKeyScope'
-        ipAllowlist:
-          type: string
-          nullable: true
-          example: 100.64.0.0/10
         expiresAt:
           type: string
           format: date-time
@@ -606,9 +602,6 @@ components:
           type: string
         scope:
           $ref: '#/components/schemas/ApiKeyScope'
-        ipAllowlist:
-          type: string
-          nullable: true
         revoked:
           type: boolean
         lastUsedAt:

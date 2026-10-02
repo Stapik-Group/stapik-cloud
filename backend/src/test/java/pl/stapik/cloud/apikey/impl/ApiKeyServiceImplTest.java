@@ -82,7 +82,6 @@ class ApiKeyServiceImplTest {
                 .extensionId(extensionId)
                 .label("my-key")
                 .scope(scope)
-                .ipAllowlist("127.0.0.1")
                 .expiresAt(Instant.now(clock))
                 .build();
 

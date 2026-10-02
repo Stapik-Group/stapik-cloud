@@ -21,13 +21,8 @@ import java.time.ZoneOffset;
 public interface ApiKeyMapper {
 
     @Mapping(target = "scope", expression = "java(pl.stapik.cloud.admin.data.ApiKeyScope.fromValue(apiKey.getScope().name()))")
-    @Mapping(target = "ipAllowlist", expression = "java(wrapIpAllowlist(apiKey.getIpAllowlist()))")
     @Mapping(target = "lastUsedAt", expression = "java(wrapLastUsedAt(apiKey.getLastUsedAt()))")
     ApiKeyResponse toResponse(ApiKeyData apiKey);
-
-    default JsonNullable<String> wrapIpAllowlist(String value) {
-        return JsonNullable.of(value);
-    }
 
     default JsonNullable<OffsetDateTime> wrapLastUsedAt(Instant value) {
         return JsonNullable.of(value == null ? null : value.atOffset(ZoneOffset.UTC));
@@ -38,7 +33,6 @@ public interface ApiKeyMapper {
                 .id(apiKey.getId())
                 .label(apiKey.getLabel())
                 .scope(pl.stapik.cloud.admin.data.ApiKeyScope.fromValue(apiKey.getScope().name()))
-                .ipAllowlist(apiKey.getIpAllowlist())
                 .revoked(apiKey.isRevoked())
                 .lastUsedAt(apiKey.getLastUsedAt() == null ? null : apiKey.getLastUsedAt().atOffset(ZoneOffset.UTC))
                 .createdAt(apiKey.getCreatedAt().atOffset(ZoneOffset.UTC))

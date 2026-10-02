@@ -13,6 +13,5 @@ public class CreateApiKeyInfo {
     private UUID extensionId;
     private String label;
     private ApiKeyScope scope;
-    private String ipAllowlist;
     private Instant expiresAt;
 }

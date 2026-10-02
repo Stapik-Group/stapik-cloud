@@ -34,9 +34,6 @@ public class ApiKeyData {
     @Column(nullable = false)
     private ApiKeyScope scope;
 
-    @Column(name = "ip_allowlist")
-    private String ipAllowlist;
-
     @Column(name = "expires_at")
     private Instant expiresAt;
 

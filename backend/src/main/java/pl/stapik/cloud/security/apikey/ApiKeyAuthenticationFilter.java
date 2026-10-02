@@ -36,7 +36,6 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
             apiKeyRepository.findByKeyPrefixAndRevokedFalse(prefix)
                     .filter(apiKey -> hashingService.matches(rawKey, apiKey.getHashedKey()))
                     .filter(this::notExpired)
-                    .filter(apiKey -> isAllowedIp(apiKey, request.getRemoteAddr()))
                     .ifPresent(this::authenticate);
         }
 
@@ -45,11 +44,6 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
 
     private boolean notExpired(ApiKeyData apiKey) {
         return apiKey.getExpiresAt() == null || apiKey.getExpiresAt().isAfter(Instant.now());
-    }
-
-    private boolean isAllowedIp(ApiKeyData apiKey, String remoteAddr) {
-        String allowlist = apiKey.getIpAllowlist();
-        return allowlist == null || allowlist.isBlank() || CidrMatcher.matches(allowlist, remoteAddr);
     }
 
     private void authenticate(ApiKeyData apiKey) {

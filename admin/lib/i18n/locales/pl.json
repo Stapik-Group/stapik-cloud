@@ -63,7 +63,6 @@
   "apiKeys.newKey": "Nowy klucz",
   "apiKeys.label": "Etykieta (urządzenie)",
   "apiKeys.scope": "Zakres",
-  "apiKeys.ipAllowlist": "IP allowlist (opcjonalnie, CIDR)",
   "apiKeys.submit": "Wygeneruj klucz",
   "apiKeys.submitting": "Tworzenie...",
   "extensionDetail.deleteConfirm": "Usunąć to rozszerzenie wraz ze wszystkimi slotami, kluczami i danymi? Tej operacji nie da się cofnąć.",
