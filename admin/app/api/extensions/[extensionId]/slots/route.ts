@@ -2,11 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminApiFetch } from "@/lib/api-client";
 import type { components } from "@/lib/api-types";
 
-type DocumentSlotListResponse = components["schemas"]["DocumentSlotListResponse"];
 type CreateDocumentSlotRequest = components["schemas"]["CreateDocumentSlotRequest"];
 
 export async function GET(
-    request: NextRequest,
     { params }: { params: Promise<{ extensionId: string }> },
 ) {
     const { extensionId } = await params;

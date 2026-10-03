@@ -47,9 +47,9 @@ public class DocumentSlotDelegate implements SlotsApiDelegate {
         boolean versioningEnabled = Optional.ofNullable(request.getVersioningEnabled()).orElse(DEFAULT_VERSIONING_ENABLED);
         int maxVersionsRetained = Optional.ofNullable(request.getMaxVersionsRetained()).orElse(DEFAULT_MAX_VERSIONS_RETAINED);
 
-        ConflictStrategy conflictStrategy = Optional.ofNullable(request.getConflictStrategy()).isPresent()
-                ? ConflictStrategy.valueOf(request.getConflictStrategy().getValue())
-                : DEFAULT_CONFLICT_STRATEGY;
+        ConflictStrategy conflictStrategy = Optional.ofNullable(request.getConflictStrategy()).isPresent() ?
+                ConflictStrategy.valueOf(request.getConflictStrategy().getValue()) :
+                DEFAULT_CONFLICT_STRATEGY;
 
         DocumentSlotData created = documentSlotServiceImpl.create(
                 DocumentIdentifier.of(extensionId, request.getSlotKey()),

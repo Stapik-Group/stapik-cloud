@@ -31,8 +31,6 @@ function removeWhitespaceOutsideStrings(json: string): string {
     return result;
 }
 
-// Pretty-prints only when re-serialising does not change any value (big integers, number formats,
-// duplicate keys, escapes). Otherwise the stored text is shown untouched.
 function formatForEditing(rawContent: string): string {
     try {
         const prettyContent = JSON.stringify(JSON.parse(rawContent), null, INDENT);
