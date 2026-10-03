@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState, type SubmitEventHandler } from "react";
 import { useTranslation } from "@/lib/i18n/LocaleProvider";
 
 export default function LoginPage() {
@@ -10,7 +10,7 @@ export default function LoginPage() {
     const [error, setError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    const handleSubmit: SubmitEventHandler<HTMLFormElement> = async (event) => {
         event.preventDefault();
         setError(null);
         setIsSubmitting(true);

@@ -98,8 +98,9 @@ class DocumentDataSlotServiceTest {
         when(extensionRepository.existsById(EXTENSION_ID)).thenReturn(false);
 
         // when / then
+        DocumentIdentifier notes = DocumentIdentifier.of(EXTENSION_ID, "notes");
         assertThatThrownBy(() -> documentSlotServiceImpl.create(
-                DocumentIdentifier.of(EXTENSION_ID, "notes"),
+                notes,
                 ContentType.TEXT,
                 1_048_576L,
                 true,

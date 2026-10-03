@@ -20,6 +20,7 @@ import pl.stapik.cloud.documentslot.data.ConflictStrategy;
 import pl.stapik.cloud.documentslot.data.DocumentSlotData;
 import pl.stapik.cloud.documentslot.DocumentSlotRepository;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -45,6 +46,9 @@ class DocumentDataServiceTest {
 
     @Mock
     private ConflictResolver conflictResolver;
+
+    @Mock
+    private Clock clock;
 
     private DocumentServiceImpl documentServiceImpl;
 
@@ -611,7 +615,8 @@ class DocumentDataServiceTest {
 
         // when / then
         DocumentIdentifier documentIdentifier = DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY);
-        assertThatThrownBy(() -> documentServiceImpl.updateContent(documentIdentifier, "content", Instant.now()))
+        Instant instantNow = Instant.now();
+        assertThatThrownBy(() -> documentServiceImpl.updateContent(documentIdentifier, "content", instantNow))
                 .isInstanceOf(NoSuchElementException.class);
 
         verify(documentRepository, never()).save(any());
@@ -713,7 +718,7 @@ class DocumentDataServiceTest {
     void shouldListPartitionsOfSlot() {
         // given
         DocumentSlotData slot = slot(ConflictStrategy.LAST_WRITE_WINS);
-        DocumentPartitionSummary summary = org.mockito.Mockito.mock(DocumentPartitionSummary.class);
+        DocumentPartitionSummary summary = mock(DocumentPartitionSummary.class);
         when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY)).thenReturn(Optional.of(slot));
         when(documentRepository.findPartitionSummaries(SLOT_ID)).thenReturn(List.of(summary));
 

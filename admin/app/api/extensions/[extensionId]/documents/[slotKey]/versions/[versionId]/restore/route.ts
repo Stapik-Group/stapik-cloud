@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminApiFetch } from "@/lib/api-client";
 
 export async function POST(
-    request: NextRequest,
     {
         params,
     }: {

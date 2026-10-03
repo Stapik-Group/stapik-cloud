@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState, type SubmitEventHandler } from "react";
 import { useRouter } from "next/navigation";
 import type { components } from "@/lib/api-types";
 import { useTranslation } from "@/lib/i18n/LocaleProvider";
@@ -26,7 +26,7 @@ export function CreateSlotForm({ extensionId }: { extensionId: string }) {
     const [error, setError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    const handleSubmit: SubmitEventHandler<HTMLFormElement> = async (event) => {
         event.preventDefault();
         setError(null);
         setIsSubmitting(true);
