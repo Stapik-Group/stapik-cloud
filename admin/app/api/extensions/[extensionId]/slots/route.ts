@@ -5,6 +5,7 @@ import type { components } from "@/lib/api-types";
 type CreateDocumentSlotRequest = components["schemas"]["CreateDocumentSlotRequest"];
 
 export async function GET(
+    _request: NextRequest,
     { params }: { params: Promise<{ extensionId: string }> },
 ) {
     const { extensionId } = await params;

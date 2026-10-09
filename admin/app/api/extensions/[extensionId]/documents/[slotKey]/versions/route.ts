@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { adminApiFetch } from "@/lib/api-client";
 
 export async function GET(
+    _request: NextRequest,
     { params }: { params: Promise<{ extensionId: string; slotKey: string }> },
 ) {
     const { extensionId, slotKey } = await params;
