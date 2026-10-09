@@ -18,6 +18,7 @@ import pl.stapik.cloud.util.StringUtils;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 
 @Component
 @RequiredArgsConstructor
@@ -26,6 +27,7 @@ public class GlobalHttpLoggingFilter extends OncePerRequestFilter {
     private static final Logger consoleLog = LoggerFactory.getLogger("HTTP_CONSOLE");
     private static final Logger fullLog = LoggerFactory.getLogger("HTTP_FULL");
     private static final String TRACE_ID_KEY = "traceId";
+    private static final String MULTIPART_BODY_PLACEHOLDER = "MULTIPART_BODY_NOT_LOGGED";
 
     private final TruncatedLoggerBuilder truncatedLogger;
     private final JsonLoggerBuilder jsonLogger;
@@ -38,15 +40,22 @@ public class GlobalHttpLoggingFilter extends OncePerRequestFilter {
         String traceId = StringUtils.generateTraceId();
         MDC.put(TRACE_ID_KEY, traceId);
 
-        CachedBodyHttpServletRequestWrapper cachedRequest = new CachedBodyHttpServletRequestWrapper(request);
         ContentCachingResponseWrapper cachedResponse = new ContentCachingResponseWrapper(response);
 
-        String requestBody = new String(cachedRequest.getCachedBody(), StandardCharsets.UTF_8);
+        HttpServletRequest requestToPass = request;
+        String requestBody;
+        if (isMultipart(request)) {
+            requestBody = MULTIPART_BODY_PLACEHOLDER;
+        } else {
+            CachedBodyHttpServletRequestWrapper cachedRequest = new CachedBodyHttpServletRequestWrapper(request);
+            requestToPass = cachedRequest;
+            requestBody = new String(cachedRequest.getCachedBody(), StandardCharsets.UTF_8);
+        }
         long startTime = System.nanoTime();
 
         try {
             logRequest(request, requestBody);
-            filterChain.doFilter(cachedRequest, cachedResponse);
+            filterChain.doFilter(requestToPass, cachedResponse);
         } finally {
             long durationMs = (System.nanoTime() - startTime) / 1_000_000;
 
@@ -56,6 +65,11 @@ public class GlobalHttpLoggingFilter extends OncePerRequestFilter {
             cachedResponse.copyBodyToResponse();
             MDC.remove(TRACE_ID_KEY);
         }
+    }
+
+    private static boolean isMultipart(HttpServletRequest request) {
+        String contentType = request.getContentType();
+        return contentType != null && contentType.toLowerCase(Locale.ROOT).startsWith("multipart/");
     }
 
     private void logRequest(HttpServletRequest request, String requestBody) {
