@@ -12,7 +12,7 @@ import pl.stapik.cloud.apikey.data.ApiKeyData;
 import pl.stapik.cloud.apikey.data.ApiKeyScope;
 import pl.stapik.cloud.apikey.dto.CreateApiKeyInfo;
 import pl.stapik.cloud.apikey.dto.CreatedApiKey;
-import pl.stapik.cloud.common.crypto.HashingService;
+import pl.stapik.cloud.common.crypto.ApiKeyHasher;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -39,7 +39,7 @@ class ApiKeyServiceImplTest {
     private ApiKeyGenerator apiKeyGenerator;
 
     @Mock
-    private HashingService hashingService;
+    private ApiKeyHasher apiKeyHasher;
 
     @Spy
     private Clock clock = Clock.fixed(Instant.parse("2026-07-26T22:45:00Z"), ZoneId.of("UTC"));
@@ -72,7 +72,7 @@ class ApiKeyServiceImplTest {
         String prefix = "pre";
 
         given(apiKeyGenerator.generate()).willReturn(new ApiKeyGenerator.GeneratedKey(rawKey, prefix));
-        given(hashingService.hash(anyString())).willReturn(hashedKey);
+        given(apiKeyHasher.hash(anyString())).willReturn(hashedKey);
 
         ApiKeyData savedKey = ApiKeyData.builder().id(UUID.randomUUID()).build();
         given(apiKeyRepository.save(any(ApiKeyData.class))).willReturn(savedKey);

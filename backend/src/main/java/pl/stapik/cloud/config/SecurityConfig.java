@@ -16,7 +16,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 import pl.stapik.cloud.apikey.ApiKeyRepository;
-import pl.stapik.cloud.common.crypto.HashingService;
+import pl.stapik.cloud.common.crypto.ApiKeyHasher;
 import pl.stapik.cloud.extension.ExtensionRepository;
 import pl.stapik.cloud.security.admin.JwtAuthenticationFilter;
 import pl.stapik.cloud.security.admin.JwtService;
@@ -41,11 +41,11 @@ public class SecurityConfig {
     public SecurityConfig(@Qualifier("handlerExceptionResolver") HandlerExceptionResolver exceptionResolver,
                           ApiKeyRepository apiKeyRepository,
                           ExtensionRepository extensionRepository,
-                          HashingService hashingService,
+                          ApiKeyHasher apiKeyHasher,
                           JwtService jwtService,
                           RateLimitProperties rateLimitProperties) {
         this.exceptionResolver = exceptionResolver;
-        this.apiKeyAuthenticationFilter = new ApiKeyAuthenticationFilter(apiKeyRepository, extensionRepository, hashingService);
+        this.apiKeyAuthenticationFilter = new ApiKeyAuthenticationFilter(apiKeyRepository, extensionRepository, apiKeyHasher);
         this.jwtAuthenticationFilter = new JwtAuthenticationFilter(jwtService);
         this.apiKeyRateLimitFilter = new ApiKeyRateLimitFilter(
                 new KeyedRateLimiter(rateLimitProperties.apiKey().requestsPerMinute()), exceptionResolver);

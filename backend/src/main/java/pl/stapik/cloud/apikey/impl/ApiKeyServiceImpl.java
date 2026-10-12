@@ -9,7 +9,7 @@ import pl.stapik.cloud.apikey.dto.CreateApiKeyInfo;
 import pl.stapik.cloud.apikey.dto.CreatedApiKey;
 import pl.stapik.cloud.audit.Auditing;
 import pl.stapik.cloud.audit.data.AuditAction;
-import pl.stapik.cloud.common.crypto.HashingService;
+import pl.stapik.cloud.common.crypto.ApiKeyHasher;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -23,7 +23,7 @@ public class ApiKeyServiceImpl implements ApiKeyService {
 
     private final ApiKeyRepository apiKeyRepository;
     private final ApiKeyGenerator apiKeyGenerator;
-    private final HashingService hashingService;
+    private final ApiKeyHasher apiKeyHasher;
     private final Clock clock;
 
     @Override
@@ -52,7 +52,7 @@ public class ApiKeyServiceImpl implements ApiKeyService {
                 .extensionId(createApiKeyInfo.getExtensionId())
                 .label(createApiKeyInfo.getLabel())
                 .keyPrefix(generated.prefix())
-                .hashedKey(hashingService.hash(generated.rawKey()))
+                .hashedKey(apiKeyHasher.hash(generated.rawKey()))
                 .scope(createApiKeyInfo.getScope())
                 .expiresAt(createApiKeyInfo.getExpiresAt())
                 .revoked(false)
