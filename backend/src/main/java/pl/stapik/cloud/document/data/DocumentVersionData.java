@@ -42,4 +42,10 @@ public class DocumentVersionData {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private VersionReason reason;
+
+    @Column(name = "device_id")
+    private UUID deviceId;
+
+    @Column(name = "device_label")
+    private String deviceLabel;
 }

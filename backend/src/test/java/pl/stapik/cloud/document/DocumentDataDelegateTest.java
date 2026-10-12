@@ -223,6 +223,20 @@ class DocumentDataDelegateTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void shouldReportDeviceThatWroteVersionInHistory() throws Exception {
+        // given
+        insertDocumentSlot(UUID.randomUUID(), extensionId, "device-slot");
+        putDocument("/api/v1/documents/{slotKey}", "from device", "device-slot");
+
+        // when & then
+        mockMvc.perform(get("/api/v1/documents/{slotKey}/versions", "device-slot")
+                        .header(API_KEY_HEADER, rawApiKey))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.versions[0].deviceId").isNotEmpty())
+                .andExpect(jsonPath("$.versions[0].deviceLabel").value("test-key"));
+    }
+
+    @Test
     void shouldReturnNotFoundWhenListingVersionsForMissingSlot() throws Exception {
         // when & then
         mockMvc.perform(get("/api/v1/documents/{slotKey}/versions", "missing-slot")

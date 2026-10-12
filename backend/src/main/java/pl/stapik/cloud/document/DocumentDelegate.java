@@ -8,6 +8,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import pl.stapik.cloud.document.data.DocumentData;
 import pl.stapik.cloud.document.dto.DocumentIdentifier;
+import pl.stapik.cloud.document.dto.DocumentWriter;
 import pl.stapik.cloud.document.dto.WriteResult;
 import pl.stapik.cloud.internal.api.DocumentsApiDelegate;
 import pl.stapik.cloud.internal.data.DocumentChangeListResponse;
@@ -113,7 +114,8 @@ public class DocumentDelegate implements DocumentsApiDelegate {
         WriteResult result = documentService.write(
                 identifier,
                 documentWriteRequest.getContent(),
-                DocumentETag.parse(ifMatch)
+                DocumentETag.parse(ifMatch),
+                currentWriter()
         );
 
         return documentResponse(result.conflict() ? 409 : 200, result.documentData(), identifier.getSlotKey());
@@ -133,7 +135,7 @@ public class DocumentDelegate implements DocumentsApiDelegate {
     }
 
     private ResponseEntity<DocumentResponse> restoreVersion(DocumentIdentifier identifier, UUID versionId) {
-        DocumentData restored = documentService.restoreVersion(identifier, versionId);
+        DocumentData restored = documentService.restoreVersion(identifier, versionId, currentWriter());
         return documentResponse(200, restored, identifier.getSlotKey());
     }
 
@@ -143,13 +145,20 @@ public class DocumentDelegate implements DocumentsApiDelegate {
                 .body(documentMapper.toResponse(documentData, slotKey));
     }
 
+    private DocumentWriter currentWriter() {
+        ApiKeyPrincipal principal = currentPrincipal();
+        return new DocumentWriter(principal.apiKeyId(), principal.keyLabel());
+    }
+
     private UUID currentExtensionId() {
-        ApiKeyPrincipal principal = Optional.of(SecurityContextHolder.getContext())
+        return currentPrincipal().extensionId();
+    }
+
+    private ApiKeyPrincipal currentPrincipal() {
+        return Optional.of(SecurityContextHolder.getContext())
                 .map(SecurityContext::getAuthentication)
                 .map(Authentication::getPrincipal)
                 .map(p -> (ApiKeyPrincipal) p)
                 .orElseThrow();
-
-        return principal.extensionId();
     }
 }

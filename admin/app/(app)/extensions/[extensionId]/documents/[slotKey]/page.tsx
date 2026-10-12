@@ -120,6 +120,11 @@ export default async function DocumentBrowserPage({ params, }: {
                                     >
                                         {t(REASON_KEYS[version.reason])}
                                     </p>
+                                    {version.deviceLabel && (
+                                        <p className="text-xs text-text-muted">
+                                            {t("documents.writtenBy", { device: version.deviceLabel })}
+                                        </p>
+                                    )}
                                 </div>
                                 <RestoreVersionButton
                                     extensionId={extensionId}

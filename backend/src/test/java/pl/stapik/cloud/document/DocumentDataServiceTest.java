@@ -14,6 +14,7 @@ import pl.stapik.cloud.document.data.DocumentVersionData;
 import pl.stapik.cloud.document.data.VersionReason;
 import pl.stapik.cloud.document.dto.DocumentChangeSummary;
 import pl.stapik.cloud.document.dto.DocumentIdentifier;
+import pl.stapik.cloud.document.dto.DocumentWriter;
 import pl.stapik.cloud.document.dto.DocumentPartitionSummary;
 import pl.stapik.cloud.document.dto.WriteResult;
 import pl.stapik.cloud.document.impl.DocumentServiceImpl;
@@ -61,6 +62,7 @@ class DocumentDataServiceTest {
     private static final UUID SLOT_ID = UUID.randomUUID();
     private static final String SLOT_KEY = "slot-key";
     private static final String EXISTING_HASH = "existing-hash";
+    private static final DocumentWriter WRITER = new DocumentWriter(UUID.randomUUID(), "pixel-7");
 
     @BeforeEach
     void setUp() {
@@ -175,7 +177,7 @@ class DocumentDataServiceTest {
         when(documentRepository.save(any(DocumentData.class))).thenAnswer(inv -> inv.getArgument(0));
 
         // when
-        WriteResult result = documentServiceImpl.write(DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), "content", null);
+        WriteResult result = documentServiceImpl.write(DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), "content", null, WRITER);
 
         // then
         assertThat(result.conflict()).isFalse();
@@ -208,7 +210,7 @@ class DocumentDataServiceTest {
         when(documentRepository.save(any(DocumentData.class))).thenAnswer(inv -> inv.getArgument(0));
 
         // when
-        WriteResult result = documentServiceImpl.write(DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), "new content", null);
+        WriteResult result = documentServiceImpl.write(DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), "new content", null, WRITER);
 
         // then
         assertThat(result.conflict()).isFalse();
@@ -216,7 +218,9 @@ class DocumentDataServiceTest {
         assertThat(result.documentData().getContent()).isEqualTo("new content");
         assertThat(result.documentData().getDeletedAt()).isNull();
 
-        verify(documentVersionRepository).save(argThat(v -> v.getReason() == VersionReason.NORMAL_WRITE));
+        verify(documentVersionRepository).save(argThat(v -> v.getReason() == VersionReason.NORMAL_WRITE
+                && WRITER.deviceId().equals(v.getDeviceId())
+                && "pixel-7".equals(v.getDeviceLabel())));
         verifyNoInteractions(conflictResolver);
     }
 
@@ -243,7 +247,7 @@ class DocumentDataServiceTest {
         when(documentRepository.save(any(DocumentData.class))).thenAnswer(inv -> inv.getArgument(0));
 
         // when
-        WriteResult result = documentServiceImpl.write(DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), "new content", clientHash);
+        WriteResult result = documentServiceImpl.write(DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), "new content", clientHash, WRITER);
 
         // then
         assertThat(result.conflict()).isFalse();
@@ -270,7 +274,7 @@ class DocumentDataServiceTest {
         when(documentRepository.findForUpdateByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.of(existing));
 
         // when
-        WriteResult result = documentServiceImpl.write(DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), "same content", "stale-hash");
+        WriteResult result = documentServiceImpl.write(DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), "same content", "stale-hash", WRITER);
 
         // then
         assertThat(result.conflict()).isFalse();
@@ -304,7 +308,7 @@ class DocumentDataServiceTest {
                 .thenReturn(new ConflictDecision(false, true));
 
         // when
-        WriteResult result = documentServiceImpl.write(DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), "conflicting content", clientHash);
+        WriteResult result = documentServiceImpl.write(DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), "conflicting content", clientHash, WRITER);
 
         // then
         assertThat(result.conflict()).isTrue();
@@ -312,6 +316,7 @@ class DocumentDataServiceTest {
 
         verify(documentVersionRepository).save(argThat(v ->
                 v.getReason() == VersionReason.CONFLICT_DISCARDED
+                        && WRITER.deviceId().equals(v.getDeviceId())
                         && v.getContent().equals("conflicting content")
                         && v.getDocumentId().equals(existing.getId())
         ));
@@ -341,7 +346,7 @@ class DocumentDataServiceTest {
                 .thenReturn(new ConflictDecision(false, false));
 
         // when
-        WriteResult result = documentServiceImpl.write(DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), "conflicting content", clientHash);
+        WriteResult result = documentServiceImpl.write(DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), "conflicting content", clientHash, WRITER);
 
         // then
         assertThat(result.conflict()).isTrue();
@@ -361,6 +366,8 @@ class DocumentDataServiceTest {
                 .updatedAt(Instant.now())
                 .build();
 
+        String clientHash = "stale-hash";
+
         when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY))
                 .thenReturn(Optional.of(slot));
         when(documentRepository.findForUpdateByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.of(existing));
@@ -368,7 +375,7 @@ class DocumentDataServiceTest {
 
         // when / then
         DocumentIdentifier documentIdentifier = DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY);
-        assertThatThrownBy(() -> documentServiceImpl.write(documentIdentifier, "content", EXISTING_HASH))
+        assertThatThrownBy(() -> documentServiceImpl.write(documentIdentifier, "content", clientHash, WRITER))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("LAST_WRITE_WINS_WITH_SHADOW_COPY");
     }
@@ -393,7 +400,7 @@ class DocumentDataServiceTest {
         when(documentRepository.save(any(DocumentData.class))).thenAnswer(inv -> inv.getArgument(0));
 
         // when
-        DocumentData result = documentServiceImpl.restoreVersion(DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), versionId);
+        DocumentData result = documentServiceImpl.restoreVersion(DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), versionId, WRITER);
 
         // then
         assertThat(result.getContent()).isEqualTo("restored content");
@@ -419,7 +426,7 @@ class DocumentDataServiceTest {
 
         // when / then
         DocumentIdentifier documentIdentifier = DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY);
-        assertThatThrownBy(() -> documentServiceImpl.restoreVersion(documentIdentifier, versionId))
+        assertThatThrownBy(() -> documentServiceImpl.restoreVersion(documentIdentifier, versionId, WRITER))
                 .isInstanceOf(NoSuchElementException.class)
                 .hasMessageContaining(versionId.toString());
 
@@ -446,7 +453,7 @@ class DocumentDataServiceTest {
 
         // when / then
         DocumentIdentifier documentIdentifier = DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY);
-        assertThatThrownBy(() -> documentServiceImpl.restoreVersion(documentIdentifier, versionId))
+        assertThatThrownBy(() -> documentServiceImpl.restoreVersion(documentIdentifier, versionId, WRITER))
                 .isInstanceOf(NoSuchElementException.class);
 
         verify(documentRepository, never()).save(any());
@@ -518,7 +525,7 @@ class DocumentDataServiceTest {
         when(documentRepository.save(any(DocumentData.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // when
-        documentServiceImpl.write(DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), "new content", EXISTING_HASH);
+        documentServiceImpl.write(DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), "new content", EXISTING_HASH, WRITER);
 
         // then
         InOrder saveBeforePrune = inOrder(documentVersionRepository);
@@ -549,7 +556,7 @@ class DocumentDataServiceTest {
                 .thenReturn(new ConflictDecision(false, true));
 
         // when
-        documentServiceImpl.write(DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), "conflicting content", clientHash);
+        documentServiceImpl.write(DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), "conflicting content", clientHash, WRITER);
 
         // then
         verify(documentVersionRepository).deleteAllExceptNewest(existing.getId(), maxVersionsRetained);
@@ -576,7 +583,7 @@ class DocumentDataServiceTest {
         when(documentRepository.save(any(DocumentData.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // when
-        documentServiceImpl.restoreVersion(DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), versionId);
+        documentServiceImpl.restoreVersion(DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), versionId, WRITER);
 
         // then
         verify(documentVersionRepository).deleteAllExceptNewest(documentId, maxVersionsRetained);
@@ -704,7 +711,7 @@ class DocumentDataServiceTest {
 
         // when
         WriteResult result = documentServiceImpl.write(
-                DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY, partitionKey), contentWithMultiByteCharacters, null);
+                DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY, partitionKey), contentWithMultiByteCharacters, null, WRITER);
 
         // then
         assertThat(result.conflict()).isFalse();
@@ -739,7 +746,7 @@ class DocumentDataServiceTest {
 
         // when
         DocumentData result = documentServiceImpl.write(
-                DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), "new content", EXISTING_HASH).documentData();
+                DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), "new content", EXISTING_HASH, WRITER).documentData();
 
         // then
         assertThat(result.getSizeBytes()).isEqualTo("new content".length());

@@ -579,6 +579,13 @@ components:
           format: date-time
         reason:
           $ref: '#/components/schemas/VersionReason'
+        deviceId:
+          type: string
+          format: uuid
+          description: Id of the API key (device) that wrote this version; absent for versions written from the admin panel.
+        deviceLabel:
+          type: string
+          description: Label of that device's API key at the time of writing.
 
     VersionReason:
       type: string

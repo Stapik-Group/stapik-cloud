@@ -5,6 +5,7 @@ import pl.stapik.cloud.document.data.DocumentVersionData;
 import pl.stapik.cloud.document.dto.DocumentChangeSummary;
 import pl.stapik.cloud.document.dto.DocumentIdentifier;
 import pl.stapik.cloud.document.dto.DocumentPartitionSummary;
+import pl.stapik.cloud.document.dto.DocumentWriter;
 import pl.stapik.cloud.document.dto.WriteResult;
 
 import java.time.Instant;
@@ -14,8 +15,8 @@ import java.util.UUID;
 public interface DocumentService {
     DocumentData getCurrent(DocumentIdentifier identifier);
     List<DocumentVersionData> listVersions(DocumentIdentifier identifier);
-    WriteResult write(DocumentIdentifier identifier, String content, String clientContentHash);
-    DocumentData restoreVersion(DocumentIdentifier identifier, UUID versionId);
+    WriteResult write(DocumentIdentifier identifier, String content, String clientContentHash, DocumentWriter writer);
+    DocumentData restoreVersion(DocumentIdentifier identifier, UUID versionId, DocumentWriter writer);
     DocumentData updateContent(DocumentIdentifier identifier, String content, String clientContentHash);
     void delete(DocumentIdentifier identifier);
     List<DocumentPartitionSummary> listPartitions(DocumentIdentifier identifier);

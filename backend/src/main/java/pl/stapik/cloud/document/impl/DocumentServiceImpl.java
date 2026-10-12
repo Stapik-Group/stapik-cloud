@@ -17,6 +17,7 @@ import pl.stapik.cloud.document.data.VersionReason;
 import pl.stapik.cloud.document.dto.DocumentChangeSummary;
 import pl.stapik.cloud.document.dto.DocumentIdentifier;
 import pl.stapik.cloud.document.dto.DocumentPartitionSummary;
+import pl.stapik.cloud.document.dto.DocumentWriter;
 import pl.stapik.cloud.document.dto.WriteResult;
 import pl.stapik.cloud.documentslot.data.ConflictStrategy;
 import pl.stapik.cloud.documentslot.data.DocumentSlotData;
@@ -56,7 +57,7 @@ public class DocumentServiceImpl implements DocumentService {
 
     @Transactional
     @Override
-    public WriteResult write(DocumentIdentifier identifier, String content, String clientContentHash) {
+    public WriteResult write(DocumentIdentifier identifier, String content, String clientContentHash, DocumentWriter writer) {
         DocumentSlotData slot = requireSlot(identifier);
         Optional<DocumentData> rawExisting = documentRepository
                 .findForUpdateByDocumentSlotIdAndPartitionKey(slot.getId(), identifier.getPartitionKey());
@@ -67,7 +68,7 @@ public class DocumentServiceImpl implements DocumentService {
                     .map(deleted -> applyContent(deleted, content))
                     .orElseGet(() -> createDocument(slot.getId(), identifier.getPartitionKey(), content));
 
-            saveVersion(slot, documentData.getId(), content, VersionReason.NORMAL_WRITE);
+            saveVersion(slot, documentData.getId(), content, VersionReason.NORMAL_WRITE, writer);
             return new WriteResult(documentData, false);
         }
 
@@ -81,20 +82,20 @@ public class DocumentServiceImpl implements DocumentService {
 
         if (!decision.writeAccepted()) {
             if (decision.preserveDiscardedVersion()) {
-                saveVersion(slot, existing.getId(), content, VersionReason.CONFLICT_DISCARDED);
+                saveVersion(slot, existing.getId(), content, VersionReason.CONFLICT_DISCARDED, writer);
             }
             return new WriteResult(existing, true);
         }
 
         DocumentData saved = applyContent(existing, content);
-        saveVersion(slot, saved.getId(), content, VersionReason.NORMAL_WRITE);
+        saveVersion(slot, saved.getId(), content, VersionReason.NORMAL_WRITE, writer);
         return new WriteResult(saved, false);
     }
 
     @Transactional
     @Override
     @Auditing(action = AuditAction.DOCUMENT_VERSION_RESTORED)
-    public DocumentData restoreVersion(DocumentIdentifier identifier, UUID versionId) {
+    public DocumentData restoreVersion(DocumentIdentifier identifier, UUID versionId, DocumentWriter writer) {
         DocumentSlotData slot = requireSlot(identifier);
         DocumentData documentData = requireCurrentDocumentForUpdate(slot, identifier);
 
@@ -103,7 +104,7 @@ public class DocumentServiceImpl implements DocumentService {
                 .orElseThrow(() -> new NoSuchElementException("Version not found: " + versionId));
 
         DocumentData saved = applyContent(documentData, version.getContent());
-        saveVersion(slot, saved.getId(), version.getContent(), VersionReason.MANUAL_RESTORE);
+        saveVersion(slot, saved.getId(), version.getContent(), VersionReason.MANUAL_RESTORE, writer);
         return saved;
     }
 
@@ -123,7 +124,7 @@ public class DocumentServiceImpl implements DocumentService {
         }
 
         DocumentData saved = applyContent(existing, content);
-        saveVersion(slot, saved.getId(), content, VersionReason.NORMAL_WRITE);
+        saveVersion(slot, saved.getId(), content, VersionReason.NORMAL_WRITE, DocumentWriter.NONE);
         return saved;
     }
 
@@ -175,12 +176,14 @@ public class DocumentServiceImpl implements DocumentService {
         return documentRepository.save(documentData);
     }
 
-    private void saveVersion(DocumentSlotData slot, UUID documentId, String content, VersionReason reason) {
+    private void saveVersion(DocumentSlotData slot, UUID documentId, String content, VersionReason reason, DocumentWriter writer) {
         DocumentVersionData version = DocumentVersionData.builder()
                 .documentId(documentId)
                 .content(content)
                 .savedAt(Instant.now())
                 .reason(reason)
+                .deviceId(writer.deviceId())
+                .deviceLabel(writer.deviceLabel())
                 .build();
 
         documentVersionRepository.save(version);

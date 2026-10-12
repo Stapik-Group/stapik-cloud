@@ -56,12 +56,15 @@ class DocumentDataMapperTest {
     void shouldMapVersionToVersionResponse() {
         // Given
         UUID versionId = UUID.randomUUID();
+        UUID deviceId = UUID.randomUUID();
         Instant savedAt = Instant.parse("2026-07-18T12:30:00Z");
 
         DocumentVersionData version = DocumentVersionData.builder()
                 .id(versionId)
                 .savedAt(savedAt)
                 .reason(VersionReason.MANUAL_RESTORE)
+                .deviceId(deviceId)
+                .deviceLabel("pixel-7")
                 .build();
 
         // When
@@ -72,6 +75,8 @@ class DocumentDataMapperTest {
         assertThat(response.getId()).isEqualTo(versionId);
         assertThat(response.getSavedAt()).isEqualTo(savedAt.atOffset(ZoneOffset.UTC));
         assertThat(response.getReason()).isEqualTo(MANUAL_RESTORE);
+        assertThat(response.getDeviceId()).isEqualTo(deviceId);
+        assertThat(response.getDeviceLabel()).isEqualTo("pixel-7");
     }
 
     @Test

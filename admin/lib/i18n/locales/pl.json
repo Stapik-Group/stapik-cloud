@@ -9,6 +9,7 @@
   "documents.currentContent": "Aktualna treść",
   "documents.versionHistory": "Historia wersji",
   "documents.noHistory": "Brak historii.",
+  "documents.writtenBy": "Zapisane przez: {device}",
   "documents.restore": "Przywróć",
   "login.title": "Stapik Cloud — Admin",
   "login.username": "Login",

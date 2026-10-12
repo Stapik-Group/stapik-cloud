@@ -693,6 +693,13 @@ components:
               reason:
                 type: string
                 enum: [NORMAL_WRITE, CONFLICT_DISCARDED, MANUAL_RESTORE]
+              deviceId:
+                type: string
+                format: uuid
+                description: Id of the API key (device) that wrote this version; absent for versions written from the admin panel.
+              deviceLabel:
+                type: string
+                description: Label of that device's API key at the time of writing.
 
     AuditLogEntryResponse:
       type: object

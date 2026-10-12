@@ -10,6 +10,7 @@ import pl.stapik.cloud.admin.data.AdminDocumentVersionListResponseVersionsInner;
 import pl.stapik.cloud.admin.data.AdminDocumentWriteRequest;
 import pl.stapik.cloud.document.data.DocumentData;
 import pl.stapik.cloud.document.dto.DocumentIdentifier;
+import pl.stapik.cloud.document.dto.DocumentWriter;
 
 import java.util.List;
 import java.util.UUID;
@@ -48,7 +49,7 @@ public class AdminDocumentDelegate implements AdminDocumentsApiDelegate {
 
     @Override
     public ResponseEntity<AdminDocumentResponse> restoreDocumentVersionAdmin(UUID extensionId, String slotKey, UUID versionId) {
-        DocumentData restored = documentService.restoreVersion(DocumentIdentifier.of(extensionId, slotKey), versionId);
+        DocumentData restored = documentService.restoreVersion(DocumentIdentifier.of(extensionId, slotKey), versionId, DocumentWriter.NONE);
         return adminDocumentResponse(restored, slotKey);
     }
 
