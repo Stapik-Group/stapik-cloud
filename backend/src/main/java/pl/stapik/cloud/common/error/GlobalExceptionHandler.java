@@ -10,6 +10,7 @@ import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
+import pl.stapik.cloud.security.ratelimit.TooManyRequestsException;
 
 import java.net.URI;
 import java.util.NoSuchElementException;
@@ -31,6 +32,16 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         problemDetail.setTitle("Forbidden");
         problemDetail.setType(URI.create("urn:error:auth:forbidden"));
         return problemDetail;
+    }
+
+    @ExceptionHandler(TooManyRequestsException.class)
+    public ResponseEntity<ProblemDetail> handleTooManyRequests(TooManyRequestsException ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage());
+        problemDetail.setTitle("Too many requests");
+        problemDetail.setType(URI.create("urn:error:rate-limit:too-many-requests"));
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.getRetryAfter().toSeconds()))
+                .body(problemDetail);
     }
 
     @ExceptionHandler(NoSuchElementException.class)

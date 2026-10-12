@@ -1,4 +1,7 @@
 stapik-cloud:
+  rate-limit:
+    login:
+      ip-requests-per-minute: 1000
   security:
     jwt:
       secret: test-only-secret-never-use-in-production-aaaaaaaaaaaaaaaaaaaaaaaa

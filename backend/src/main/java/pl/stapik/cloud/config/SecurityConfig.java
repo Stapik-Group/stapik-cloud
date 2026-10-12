@@ -22,6 +22,9 @@ import pl.stapik.cloud.security.admin.JwtAuthenticationFilter;
 import pl.stapik.cloud.security.admin.JwtService;
 import pl.stapik.cloud.security.apikey.ApiKeyAuthenticationFilter;
 import pl.stapik.cloud.security.apikey.ApiKeyAuthenticationToken;
+import pl.stapik.cloud.security.ratelimit.KeyedRateLimiter;
+import pl.stapik.cloud.security.ratelimit.LoginRateLimitFilter;
+import pl.stapik.cloud.security.ratelimit.RateLimitProperties;
 
 @Configuration
 @EnableWebSecurity
@@ -30,16 +33,20 @@ public class SecurityConfig {
     private final HandlerExceptionResolver exceptionResolver;
     private final ApiKeyAuthenticationFilter apiKeyAuthenticationFilter;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final LoginRateLimitFilter loginRateLimitFilter;
 
     @Autowired
     public SecurityConfig(@Qualifier("handlerExceptionResolver") HandlerExceptionResolver exceptionResolver,
                           ApiKeyRepository apiKeyRepository,
                           ExtensionRepository extensionRepository,
                           HashingService hashingService,
-                          JwtService jwtService) {
+                          JwtService jwtService,
+                          RateLimitProperties rateLimitProperties) {
         this.exceptionResolver = exceptionResolver;
         this.apiKeyAuthenticationFilter = new ApiKeyAuthenticationFilter(apiKeyRepository, extensionRepository, hashingService);
         this.jwtAuthenticationFilter = new JwtAuthenticationFilter(jwtService);
+        this.loginRateLimitFilter = new LoginRateLimitFilter(
+                new KeyedRateLimiter(rateLimitProperties.login().ipRequestsPerMinute()), exceptionResolver);
     }
 
     @Bean
@@ -83,6 +90,7 @@ public class SecurityConfig {
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(customAuthenticationEntryPoint())
                         .accessDeniedHandler(customAccessDeniedHandler()))
+                .addFilterBefore(loginRateLimitFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

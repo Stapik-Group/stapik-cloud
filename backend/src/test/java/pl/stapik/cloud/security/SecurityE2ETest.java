@@ -29,6 +29,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -218,6 +219,42 @@ class SecurityE2ETest extends AbstractIntegrationTest {
     }
 
     @Test
+    void loginIsLockedAfterRepeatedFailuresEvenWithCorrectPassword() throws Exception {
+        insertAdminUser("lockout-admin");
+
+        for (int attempt = 0; attempt < 5; attempt++) {
+            mockMvc.perform(post("/api/admin/auth/login")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(loginPayload("lockout-admin", "wrong-password")))
+                    .andExpect(status().isUnauthorized());
+        }
+
+        mockMvc.perform(post("/api/admin/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(loginPayload("lockout-admin", "correct-password")))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().exists("Retry-After"));
+    }
+
+    @Test
+    void successfulLoginResetsFailedAttempts() throws Exception {
+        insertAdminUser("reset-admin");
+
+        for (int round = 0; round < 3; round++) {
+            for (int attempt = 0; attempt < 4; attempt++) {
+                mockMvc.perform(post("/api/admin/auth/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(loginPayload("reset-admin", "wrong-password")))
+                        .andExpect(status().isUnauthorized());
+            }
+            mockMvc.perform(post("/api/admin/auth/login")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(loginPayload("reset-admin", "correct-password")))
+                    .andExpect(status().isOk());
+        }
+    }
+
+    @Test
     void adminEndpointWithoutTokenIsRejected() throws Exception {
         mockMvc.perform(get("/api/admin/extensions"))
                 .andExpect(status().isUnauthorized());
@@ -263,6 +300,15 @@ class SecurityE2ETest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/admin/extensions")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk());
+    }
+
+    private String loginPayload(String username, String password) {
+        return """
+                {
+                    "username": "%s",
+                    "password": "%s"
+                }
+                """.formatted(username, password);
     }
 
     private void insertExtension(Connection connection, UUID id) throws Exception {

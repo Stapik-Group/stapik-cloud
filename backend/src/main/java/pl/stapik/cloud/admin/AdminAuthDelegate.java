@@ -12,6 +12,7 @@ import pl.stapik.cloud.admin.data.LoginResponse;
 import pl.stapik.cloud.admin.data.RefreshTokenRequest;
 import pl.stapik.cloud.admin.dto.AdminSession;
 import pl.stapik.cloud.admin.dto.Credentials;
+import pl.stapik.cloud.security.ratelimit.LoginAttemptTracker;
 
 import java.time.ZoneOffset;
 
@@ -21,6 +22,7 @@ public class AdminAuthDelegate implements AuthApiDelegate {
 
     private final AdminUserService adminUserService;
     private final AdminSessionService adminSessionService;
+    private final LoginAttemptTracker loginAttemptTracker;
 
     @Override
     public ResponseEntity<LoginResponse> login(LoginRequest loginRequest) {
@@ -50,7 +52,14 @@ public class AdminAuthDelegate implements AuthApiDelegate {
     }
 
     private @NonNull AdminUserData getAdminUserData(LoginRequest loginRequest) {
-        return adminUserService.authenticate(Credentials.fromLoginRequest(loginRequest))
-                .orElseThrow(() -> new BadCredentialsException("Invalid credentials"));
+        String username = loginRequest.getUsername();
+        loginAttemptTracker.checkNotLocked(username);
+        AdminUserData adminUser = adminUserService.authenticate(Credentials.fromLoginRequest(loginRequest))
+                .orElseThrow(() -> {
+                    loginAttemptTracker.recordFailure(username);
+                    return new BadCredentialsException("Invalid credentials");
+                });
+        loginAttemptTracker.reset(username);
+        return adminUser;
     }
 }

@@ -1,5 +1,6 @@
 server:
   port: ${SERVER_PORT:8077}
+  forward-headers-strategy: native
 
 spring:
   application:
@@ -61,6 +62,11 @@ stapik-cloud:
     root-path: ${ASSET_STORAGE_ROOT:/var/lib/stapik-cloud/assets}
   audit:
     retention-days: ${AUDIT_RETENTION_DAYS:365}
+  rate-limit:
+    login:
+      ip-requests-per-minute: ${LOGIN_RATE_LIMIT_PER_MINUTE:20}
+      max-failed-attempts: ${LOGIN_MAX_FAILED_ATTEMPTS:5}
+      lockout-duration: ${LOGIN_LOCKOUT_DURATION:15m}
 
 logging:
   level:
