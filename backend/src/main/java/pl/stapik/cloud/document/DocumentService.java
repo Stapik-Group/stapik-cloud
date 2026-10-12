@@ -2,10 +2,12 @@ package pl.stapik.cloud.document;
 
 import pl.stapik.cloud.document.data.DocumentData;
 import pl.stapik.cloud.document.data.DocumentVersionData;
+import pl.stapik.cloud.document.dto.DocumentChangeSummary;
 import pl.stapik.cloud.document.dto.DocumentIdentifier;
 import pl.stapik.cloud.document.dto.DocumentPartitionSummary;
 import pl.stapik.cloud.document.dto.WriteResult;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -17,4 +19,5 @@ public interface DocumentService {
     DocumentData updateContent(DocumentIdentifier identifier, String content, String clientContentHash);
     void delete(DocumentIdentifier identifier);
     List<DocumentPartitionSummary> listPartitions(DocumentIdentifier identifier);
+    List<DocumentChangeSummary> listChanges(UUID extensionId, Instant since);
 }

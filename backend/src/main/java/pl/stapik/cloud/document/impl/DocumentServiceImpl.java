@@ -14,6 +14,7 @@ import pl.stapik.cloud.document.conflict.ConflictResolver;
 import pl.stapik.cloud.document.data.DocumentData;
 import pl.stapik.cloud.document.data.DocumentVersionData;
 import pl.stapik.cloud.document.data.VersionReason;
+import pl.stapik.cloud.document.dto.DocumentChangeSummary;
 import pl.stapik.cloud.document.dto.DocumentIdentifier;
 import pl.stapik.cloud.document.dto.DocumentPartitionSummary;
 import pl.stapik.cloud.document.dto.WriteResult;
@@ -132,12 +133,19 @@ public class DocumentServiceImpl implements DocumentService {
         return documentRepository.findPartitionSummaries(slot.getId());
     }
 
+    @Override
+    public List<DocumentChangeSummary> listChanges(UUID extensionId, Instant since) {
+        return documentRepository.findChanges(extensionId, since);
+    }
+
     @Transactional
     @Override
     public void delete(DocumentIdentifier identifier) {
         DocumentSlotData slot = requireSlot(identifier);
         DocumentData documentData = requireCurrentDocumentForUpdate(slot, identifier);
-        documentData.setDeletedAt(Instant.now());
+        Instant deletedAt = Instant.now();
+        documentData.setDeletedAt(deletedAt);
+        documentData.setUpdatedAt(deletedAt);
         documentRepository.save(documentData);
     }
 

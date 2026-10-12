@@ -12,6 +12,7 @@ import pl.stapik.cloud.document.conflict.ConflictResolver;
 import pl.stapik.cloud.document.data.DocumentData;
 import pl.stapik.cloud.document.data.DocumentVersionData;
 import pl.stapik.cloud.document.data.VersionReason;
+import pl.stapik.cloud.document.dto.DocumentChangeSummary;
 import pl.stapik.cloud.document.dto.DocumentIdentifier;
 import pl.stapik.cloud.document.dto.DocumentPartitionSummary;
 import pl.stapik.cloud.document.dto.WriteResult;
@@ -466,7 +467,7 @@ class DocumentDataServiceTest {
         documentServiceImpl.delete(DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY));
 
         // then
-        verify(documentRepository).save(argThat(d -> d.getDeletedAt() != null));
+        verify(documentRepository).save(argThat(d -> d.getDeletedAt() != null && d.getDeletedAt().equals(d.getUpdatedAt())));
     }
 
     @Test
@@ -780,6 +781,20 @@ class DocumentDataServiceTest {
                 .isInstanceOf(NoSuchElementException.class)
                 .hasMessageContaining(SLOT_KEY)
                 .hasMessageContaining("2021");
+    }
+
+    @Test
+    void shouldListChangesOfExtensionSince() {
+        // given
+        Instant since = Instant.parse("2026-07-18T10:00:00Z");
+        List<DocumentChangeSummary> changes = List.of(mock(DocumentChangeSummary.class));
+        when(documentRepository.findChanges(EXTENSION_ID, since)).thenReturn(changes);
+
+        // when
+        List<DocumentChangeSummary> result = documentServiceImpl.listChanges(EXTENSION_ID, since);
+
+        // then
+        assertThat(result).isEqualTo(changes);
     }
 
     @Test

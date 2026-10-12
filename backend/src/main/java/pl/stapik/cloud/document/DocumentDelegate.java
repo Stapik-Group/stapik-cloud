@@ -10,6 +10,8 @@ import pl.stapik.cloud.document.data.DocumentData;
 import pl.stapik.cloud.document.dto.DocumentIdentifier;
 import pl.stapik.cloud.document.dto.WriteResult;
 import pl.stapik.cloud.internal.api.DocumentsApiDelegate;
+import pl.stapik.cloud.internal.data.DocumentChangeListResponse;
+import pl.stapik.cloud.internal.data.DocumentChangeResponse;
 import pl.stapik.cloud.internal.data.DocumentPartitionListResponse;
 import pl.stapik.cloud.internal.data.DocumentPartitionResponse;
 import pl.stapik.cloud.internal.data.DocumentResponse;
@@ -18,6 +20,9 @@ import pl.stapik.cloud.internal.data.DocumentVersionResponse;
 import pl.stapik.cloud.internal.data.DocumentWriteRequest;
 import pl.stapik.cloud.security.apikey.ApiKeyPrincipal;
 
+import java.time.Clock;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -28,6 +33,7 @@ public class DocumentDelegate implements DocumentsApiDelegate {
 
     private final DocumentService documentService;
     private final DocumentMapper documentMapper;
+    private final Clock clock;
 
     @Override
     public ResponseEntity<DocumentResponse> getDocument(String slotKey) {
@@ -86,6 +92,16 @@ public class DocumentDelegate implements DocumentsApiDelegate {
                 .toList();
 
         return ResponseEntity.ok(new DocumentPartitionListResponse().partitions(partitions));
+    }
+
+    @Override
+    public ResponseEntity<DocumentChangeListResponse> listChanges(OffsetDateTime since) {
+        OffsetDateTime serverTime = OffsetDateTime.now(clock).withOffsetSameInstant(ZoneOffset.UTC);
+        List<DocumentChangeResponse> changes = documentService.listChanges(currentExtensionId(), since.toInstant()).stream()
+                .map(documentMapper::toChangeResponse)
+                .toList();
+
+        return ResponseEntity.ok(new DocumentChangeListResponse().serverTime(serverTime).changes(changes));
     }
 
     private ResponseEntity<DocumentResponse> readDocument(DocumentIdentifier identifier) {
