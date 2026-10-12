@@ -71,6 +71,10 @@ public class DocumentServiceImpl implements DocumentService {
         }
 
         DocumentData existing = activeExisting.get();
+        if (isUnchanged(existing, content)) {
+            return new WriteResult(existing, false);
+        }
+
         ConflictResolver resolver = resolverFor(slot.getConflictStrategy());
         ConflictDecision decision = resolver.resolve(existing.getContentHash(), clientContentHash);
 
@@ -109,6 +113,10 @@ public class DocumentServiceImpl implements DocumentService {
         DocumentSlotData slot = requireSlot(identifier);
         DocumentData existing = requireCurrentDocumentForUpdate(slot, identifier);
 
+        if (isUnchanged(existing, content)) {
+            return existing;
+        }
+
         if (!existing.getContentHash().equals(clientContentHash)) {
             throw new DocumentModifiedException(slot.getSlotKey());
         }
@@ -131,6 +139,10 @@ public class DocumentServiceImpl implements DocumentService {
         DocumentData documentData = requireCurrentDocumentForUpdate(slot, identifier);
         documentData.setDeletedAt(Instant.now());
         documentRepository.save(documentData);
+    }
+
+    private boolean isUnchanged(DocumentData existing, String content) {
+        return hash(content).equals(existing.getContentHash());
     }
 
     private DocumentData createDocument(UUID slotId, String partitionKey, String content) {

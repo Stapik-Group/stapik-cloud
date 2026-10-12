@@ -20,8 +20,12 @@ import pl.stapik.cloud.documentslot.data.ConflictStrategy;
 import pl.stapik.cloud.documentslot.data.DocumentSlotData;
 import pl.stapik.cloud.documentslot.DocumentSlotRepository;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
@@ -248,6 +252,35 @@ class DocumentDataServiceTest {
     }
 
     @Test
+    void shouldSkipWriteWhenContentHashIsUnchanged() {
+        // given
+        DocumentSlotData slot = slot(ConflictStrategy.LAST_WRITE_WINS_WITH_SHADOW_COPY);
+        Instant existingUpdatedAt = Instant.parse("2026-07-18T10:00:00Z");
+        DocumentData existing = DocumentData.builder()
+                .id(UUID.randomUUID())
+                .documentSlotId(SLOT_ID)
+                .content("same content")
+                .contentHash(sha256())
+                .updatedAt(existingUpdatedAt)
+                .build();
+
+        when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY))
+                .thenReturn(Optional.of(slot));
+        when(documentRepository.findForUpdateByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.of(existing));
+
+        // when
+        WriteResult result = documentServiceImpl.write(DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), "same content", "stale-hash");
+
+        // then
+        assertThat(result.conflict()).isFalse();
+        assertThat(result.documentData().getUpdatedAt()).isEqualTo(existingUpdatedAt);
+
+        verify(documentRepository, never()).save(any());
+        verifyNoInteractions(documentVersionRepository);
+        verifyNoInteractions(conflictResolver);
+    }
+
+    @Test
     void shouldPreserveDiscardedVersionOnConflict() {
         // given
         DocumentSlotData slot = slot(ConflictStrategy.LAST_WRITE_WINS_WITH_SHADOW_COPY);
@@ -326,7 +359,6 @@ class DocumentDataServiceTest {
                 .documentSlotId(SLOT_ID)
                 .updatedAt(Instant.now())
                 .build();
-        String clientHash = EXISTING_HASH;
 
         when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY))
                 .thenReturn(Optional.of(slot));
@@ -335,7 +367,7 @@ class DocumentDataServiceTest {
 
         // when / then
         DocumentIdentifier documentIdentifier = DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY);
-        assertThatThrownBy(() -> documentServiceImpl.write(documentIdentifier, "content", clientHash))
+        assertThatThrownBy(() -> documentServiceImpl.write(documentIdentifier, "content", EXISTING_HASH))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("LAST_WRITE_WINS_WITH_SHADOW_COPY");
     }
@@ -586,6 +618,34 @@ class DocumentDataServiceTest {
     }
 
     @Test
+    void shouldSkipUpdateContentWhenContentHashIsUnchanged() {
+        // given
+        DocumentSlotData slot = slot(ConflictStrategy.LAST_WRITE_WINS);
+        Instant existingUpdatedAt = Instant.parse("2026-07-18T10:00:00Z");
+        DocumentData existing = DocumentData.builder()
+                .id(UUID.randomUUID())
+                .documentSlotId(SLOT_ID)
+                .content("same content")
+                .contentHash(sha256())
+                .updatedAt(existingUpdatedAt)
+                .build();
+
+        when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY))
+                .thenReturn(Optional.of(slot));
+        when(documentRepository.findForUpdateByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.of(existing));
+
+        // when
+        DocumentData result = documentServiceImpl.updateContent(
+                DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), "same content", "stale-hash");
+
+        // then
+        assertThat(result.getUpdatedAt()).isEqualTo(existingUpdatedAt);
+
+        verify(documentRepository, never()).save(any());
+        verifyNoInteractions(documentVersionRepository);
+    }
+
+    @Test
     void shouldRejectUpdateContentWhenDocumentChangedAfterClientLoadedIt() {
         // given
         DocumentSlotData slot = slot(ConflictStrategy.LAST_WRITE_WINS);
@@ -623,8 +683,7 @@ class DocumentDataServiceTest {
 
         // when / then
         DocumentIdentifier documentIdentifier = DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY);
-        String clientHash = EXISTING_HASH;
-        assertThatThrownBy(() -> documentServiceImpl.updateContent(documentIdentifier, "content", clientHash))
+        assertThatThrownBy(() -> documentServiceImpl.updateContent(documentIdentifier, "content", EXISTING_HASH))
                 .isInstanceOf(NoSuchElementException.class);
 
         verify(documentRepository, never()).save(any());
@@ -749,5 +808,14 @@ class DocumentDataServiceTest {
                 .isInstanceOf(NoSuchElementException.class)
                 .hasMessageContaining(SLOT_KEY);
         verifyNoInteractions(documentRepository);
+    }
+
+    private static String sha256() {
+        try {
+            return HexFormat.of().formatHex(
+                    MessageDigest.getInstance("SHA-256").digest("same content".getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
     }
 }
