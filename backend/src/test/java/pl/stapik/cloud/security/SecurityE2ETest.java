@@ -24,8 +24,11 @@ import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -110,6 +113,30 @@ class SecurityE2ETest extends AbstractIntegrationTest {
 
         mockMvc.perform(get("/api/v1/me").header("x-api-key", rawKey))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void readOnlyApiKeyCanReadButCannotWrite() throws Exception {
+        String rawKey = insertApiKey(extensionId, "read-only-key", "READ_ONLY", null, false);
+
+        mockMvc.perform(get("/api/v1/me").header("x-api-key", rawKey))
+                .andExpect(status().isOk());
+        mockMvc.perform(put("/api/v1/documents/settings").header("x-api-key", rawKey)
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(delete("/api/v1/documents/settings").header("x-api-key", rawKey))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/v1/documents/settings/versions/" + UUID.randomUUID() + "/restore")
+                        .header("x-api-key", rawKey))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void readWriteApiKeyPassesWriteAuthorization() throws Exception {
+        String rawKey = insertApiKey(extensionId, "read-write-key", "READ_WRITE", null, false);
+
+        mockMvc.perform(delete("/api/v1/documents/settings").header("x-api-key", rawKey))
+                .andExpect(result -> assertNotEquals(403, result.getResponse().getStatus()));
     }
 
     @Test
