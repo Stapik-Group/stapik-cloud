@@ -52,6 +52,22 @@ class DocumentDataRepositoryIT extends AbstractIntegrationTest {
     }
 
     @Test
+    void shouldFindForUpdateByDocumentSlotIdAndPartitionKey() {
+        // given
+        ExtensionData extension = createExtension();
+        DocumentSlotData slot = createDocumentSlot(extension.getId());
+        createDocument(slot.getId());
+
+        // when
+        Optional<DocumentData> result = documentRepository
+                .findForUpdateByDocumentSlotIdAndPartitionKey(slot.getId(), DocumentData.DEFAULT_PARTITION_KEY);
+
+        // then
+        assertThat(result).isPresent();
+        assertThat(result.get().getContent()).isEqualTo("some content");
+    }
+
+    @Test
     void shouldReturnEmptyWhenDocumentSlotIdNotFound() {
         // when
         Optional<DocumentData> result = documentRepository.findByDocumentSlotIdAndPartitionKey(UUID.randomUUID(), DocumentData.DEFAULT_PARTITION_KEY);
@@ -119,9 +135,9 @@ class DocumentDataRepositoryIT extends AbstractIntegrationTest {
         assertThat(summaries)
                 .extracting(DocumentPartitionSummary::getPartitionKey)
                 .containsExactly("2023", "2024");
-        assertThat(summaries.get(0).getSizeBytes()).isEqualTo(16);
-        assertThat(summaries.get(0).getContentHash()).isEqualTo("hash-2023");
-        assertThat(summaries.get(0).getUpdatedAt()).isEqualTo(updatedAt);
+        assertThat(summaries.getFirst().getSizeBytes()).isEqualTo(16);
+        assertThat(summaries.getFirst().getContentHash()).isEqualTo("hash-2023");
+        assertThat(summaries.getFirst().getUpdatedAt()).isEqualTo(updatedAt);
     }
 
     @Test

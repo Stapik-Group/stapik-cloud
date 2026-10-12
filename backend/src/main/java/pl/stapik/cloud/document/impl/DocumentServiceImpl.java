@@ -58,7 +58,7 @@ public class DocumentServiceImpl implements DocumentService {
     public WriteResult write(DocumentIdentifier identifier, String content, Instant clientLastKnownUpdate) {
         DocumentSlotData slot = requireSlot(identifier);
         Optional<DocumentData> rawExisting = documentRepository
-                .findByDocumentSlotIdAndPartitionKey(slot.getId(), identifier.getPartitionKey());
+                .findForUpdateByDocumentSlotIdAndPartitionKey(slot.getId(), identifier.getPartitionKey());
         Optional<DocumentData> activeExisting = rawExisting.filter(doc -> doc.getDeletedAt() == null);
 
         if (activeExisting.isEmpty()) {
@@ -91,7 +91,7 @@ public class DocumentServiceImpl implements DocumentService {
     @Auditing(action = AuditAction.DOCUMENT_VERSION_RESTORED)
     public DocumentData restoreVersion(DocumentIdentifier identifier, UUID versionId) {
         DocumentSlotData slot = requireSlot(identifier);
-        DocumentData documentData = requireCurrentDocument(slot, identifier);
+        DocumentData documentData = requireCurrentDocumentForUpdate(slot, identifier);
 
         DocumentVersionData version = documentVersionRepository.findById(versionId)
                 .filter(v -> v.getDocumentId().equals(documentData.getId()))
@@ -107,7 +107,7 @@ public class DocumentServiceImpl implements DocumentService {
     @Auditing(action = AuditAction.DOCUMENT_CONTENT_EDITED)
     public DocumentData updateContent(DocumentIdentifier identifier, String content, Instant clientLastKnownUpdate) {
         DocumentSlotData slot = requireSlot(identifier);
-        DocumentData existing = requireCurrentDocument(slot, identifier);
+        DocumentData existing = requireCurrentDocumentForUpdate(slot, identifier);
 
         if (clientLastKnownUpdate.isBefore(existing.getUpdatedAt())) {
             throw new DocumentModifiedException(slot.getSlotKey());
@@ -128,7 +128,7 @@ public class DocumentServiceImpl implements DocumentService {
     @Override
     public void delete(DocumentIdentifier identifier) {
         DocumentSlotData slot = requireSlot(identifier);
-        DocumentData documentData = requireCurrentDocument(slot, identifier);
+        DocumentData documentData = requireCurrentDocumentForUpdate(slot, identifier);
         documentData.setDeletedAt(Instant.now());
         documentRepository.save(documentData);
     }
@@ -168,7 +168,17 @@ public class DocumentServiceImpl implements DocumentService {
     }
 
     private DocumentData requireCurrentDocument(DocumentSlotData slot, DocumentIdentifier identifier) {
-        return documentRepository.findByDocumentSlotIdAndPartitionKey(slot.getId(), identifier.getPartitionKey())
+        return requireActive(documentRepository
+                .findByDocumentSlotIdAndPartitionKey(slot.getId(), identifier.getPartitionKey()), slot, identifier);
+    }
+
+    private DocumentData requireCurrentDocumentForUpdate(DocumentSlotData slot, DocumentIdentifier identifier) {
+        return requireActive(documentRepository
+                .findForUpdateByDocumentSlotIdAndPartitionKey(slot.getId(), identifier.getPartitionKey()), slot, identifier);
+    }
+
+    private DocumentData requireActive(Optional<DocumentData> document, DocumentSlotData slot, DocumentIdentifier identifier) {
+        return document
                 .filter(doc -> doc.getDeletedAt() == null)
                 .orElseThrow(() -> new NoSuchElementException(documentNotFoundMessage(slot, identifier)));
     }

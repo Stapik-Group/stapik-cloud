@@ -1,6 +1,8 @@
 package pl.stapik.cloud.document;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import pl.stapik.cloud.document.data.DocumentData;
@@ -12,6 +14,15 @@ import java.util.UUID;
 
 public interface DocumentRepository extends JpaRepository<DocumentData, UUID> {
     Optional<DocumentData> findByDocumentSlotIdAndPartitionKey(UUID documentSlotId, String partitionKey);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT document FROM DocumentData document
+            WHERE document.documentSlotId = :documentSlotId
+              AND document.partitionKey = :partitionKey
+            """)
+    Optional<DocumentData> findForUpdateByDocumentSlotIdAndPartitionKey(@Param("documentSlotId") UUID documentSlotId,
+                                                                       @Param("partitionKey") String partitionKey);
 
     @Query("""
             SELECT document.partitionKey AS partitionKey,

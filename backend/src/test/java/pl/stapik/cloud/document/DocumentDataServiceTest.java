@@ -165,7 +165,7 @@ class DocumentDataServiceTest {
         DocumentSlotData slot = slot(ConflictStrategy.LAST_WRITE_WINS);
         when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY))
                 .thenReturn(Optional.of(slot));
-        when(documentRepository.findByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.empty());
+        when(documentRepository.findForUpdateByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.empty());
         when(documentRepository.save(any(DocumentData.class))).thenAnswer(inv -> inv.getArgument(0));
 
         // when
@@ -198,7 +198,7 @@ class DocumentDataServiceTest {
 
         when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY))
                 .thenReturn(Optional.of(slot));
-        when(documentRepository.findByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.of(deleted));
+        when(documentRepository.findForUpdateByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.of(deleted));
         when(documentRepository.save(any(DocumentData.class))).thenAnswer(inv -> inv.getArgument(0));
 
         // when
@@ -230,7 +230,7 @@ class DocumentDataServiceTest {
 
         when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY))
                 .thenReturn(Optional.of(slot));
-        when(documentRepository.findByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.of(existing));
+        when(documentRepository.findForUpdateByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.of(existing));
         when(conflictResolver.supports()).thenReturn(ConflictStrategy.LAST_WRITE_WINS);
         when(conflictResolver.resolve(existingUpdatedAt, clientLastKnown)).thenReturn(ConflictDecision.accept());
         when(documentRepository.save(any(DocumentData.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -261,7 +261,7 @@ class DocumentDataServiceTest {
 
         when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY))
                 .thenReturn(Optional.of(slot));
-        when(documentRepository.findByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.of(existing));
+        when(documentRepository.findForUpdateByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.of(existing));
         when(conflictResolver.supports()).thenReturn(ConflictStrategy.LAST_WRITE_WINS_WITH_SHADOW_COPY);
         when(conflictResolver.resolve(existingUpdatedAt, clientLastKnown))
                 .thenReturn(new ConflictDecision(false, true));
@@ -297,7 +297,7 @@ class DocumentDataServiceTest {
 
         when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY))
                 .thenReturn(Optional.of(slot));
-        when(documentRepository.findByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.of(existing));
+        when(documentRepository.findForUpdateByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.of(existing));
         when(conflictResolver.supports()).thenReturn(ConflictStrategy.LAST_WRITE_WINS);
         when(conflictResolver.resolve(existingUpdatedAt, clientLastKnown))
                 .thenReturn(new ConflictDecision(false, false));
@@ -326,7 +326,7 @@ class DocumentDataServiceTest {
 
         when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY))
                 .thenReturn(Optional.of(slot));
-        when(documentRepository.findByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.of(existing));
+        when(documentRepository.findForUpdateByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.of(existing));
         when(conflictResolver.supports()).thenReturn(ConflictStrategy.LAST_WRITE_WINS);
 
         // when / then
@@ -351,7 +351,7 @@ class DocumentDataServiceTest {
 
         when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY))
                 .thenReturn(Optional.of(slot));
-        when(documentRepository.findByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.of(documentData));
+        when(documentRepository.findForUpdateByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.of(documentData));
         when(documentVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
         when(documentRepository.save(any(DocumentData.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -377,7 +377,7 @@ class DocumentDataServiceTest {
 
         when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY))
                 .thenReturn(Optional.of(slot));
-        when(documentRepository.findByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.of(documentData));
+        when(documentRepository.findForUpdateByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.of(documentData));
         when(documentVersionRepository.findById(versionId)).thenReturn(Optional.empty());
 
         // when / then
@@ -404,7 +404,7 @@ class DocumentDataServiceTest {
 
         when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY))
                 .thenReturn(Optional.of(slot));
-        when(documentRepository.findByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.of(documentData));
+        when(documentRepository.findForUpdateByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.of(documentData));
         when(documentVersionRepository.findById(versionId)).thenReturn(Optional.of(versionFromOtherDocument));
 
         // when / then
@@ -423,7 +423,7 @@ class DocumentDataServiceTest {
 
         when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY))
                 .thenReturn(Optional.of(slot));
-        when(documentRepository.findByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.of(documentData));
+        when(documentRepository.findForUpdateByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.of(documentData));
         when(documentRepository.save(any(DocumentData.class))).thenAnswer(inv -> inv.getArgument(0));
 
         // when
@@ -439,7 +439,7 @@ class DocumentDataServiceTest {
         DocumentSlotData slot = slot(ConflictStrategy.LAST_WRITE_WINS);
         when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY))
                 .thenReturn(Optional.of(slot));
-        when(documentRepository.findByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.empty());
+        when(documentRepository.findForUpdateByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.empty());
 
         // when / then
         DocumentIdentifier documentIdentifier = DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY);
@@ -474,7 +474,7 @@ class DocumentDataServiceTest {
 
         when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY))
                 .thenReturn(Optional.of(slot));
-        when(documentRepository.findByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.of(existing));
+        when(documentRepository.findForUpdateByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.of(existing));
         when(conflictResolver.supports()).thenReturn(ConflictStrategy.LAST_WRITE_WINS_WITH_SHADOW_COPY);
         when(conflictResolver.resolve(existingUpdatedAt, existingUpdatedAt)).thenReturn(ConflictDecision.accept());
         when(documentRepository.save(any(DocumentData.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -504,7 +504,7 @@ class DocumentDataServiceTest {
 
         when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY))
                 .thenReturn(Optional.of(slot));
-        when(documentRepository.findByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.of(existing));
+        when(documentRepository.findForUpdateByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.of(existing));
         when(conflictResolver.supports()).thenReturn(ConflictStrategy.LAST_WRITE_WINS_WITH_SHADOW_COPY);
         when(conflictResolver.resolve(existingUpdatedAt, clientLastKnown))
                 .thenReturn(new ConflictDecision(false, true));
@@ -532,7 +532,7 @@ class DocumentDataServiceTest {
 
         when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY))
                 .thenReturn(Optional.of(slot));
-        when(documentRepository.findByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.of(documentData));
+        when(documentRepository.findForUpdateByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.of(documentData));
         when(documentVersionRepository.findById(versionId)).thenReturn(Optional.of(version));
         when(documentRepository.save(any(DocumentData.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -558,7 +558,7 @@ class DocumentDataServiceTest {
 
         when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY))
                 .thenReturn(Optional.of(slot));
-        when(documentRepository.findByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.of(existing));
+        when(documentRepository.findForUpdateByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.of(existing));
         when(documentRepository.save(any(DocumentData.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // when
@@ -593,7 +593,7 @@ class DocumentDataServiceTest {
 
         when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY))
                 .thenReturn(Optional.of(slot));
-        when(documentRepository.findByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.of(existing));
+        when(documentRepository.findForUpdateByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.of(existing));
 
         // when / then
         DocumentIdentifier documentIdentifier = DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY);
@@ -611,7 +611,7 @@ class DocumentDataServiceTest {
         DocumentSlotData slot = slot(ConflictStrategy.LAST_WRITE_WINS);
         when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY))
                 .thenReturn(Optional.of(slot));
-        when(documentRepository.findByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.empty());
+        when(documentRepository.findForUpdateByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.empty());
 
         // when / then
         DocumentIdentifier documentIdentifier = DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY);
@@ -631,7 +631,7 @@ class DocumentDataServiceTest {
         DocumentSlotData slot = slot(ConflictStrategy.LAST_WRITE_WINS);
 
         when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY)).thenReturn(Optional.of(slot));
-        when(documentRepository.findByDocumentSlotIdAndPartitionKey(SLOT_ID, partitionKey)).thenReturn(Optional.empty());
+        when(documentRepository.findForUpdateByDocumentSlotIdAndPartitionKey(SLOT_ID, partitionKey)).thenReturn(Optional.empty());
         when(documentRepository.save(any(DocumentData.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // when
@@ -645,7 +645,7 @@ class DocumentDataServiceTest {
                 .isEqualTo(contentWithMultiByteCharacters.getBytes(java.nio.charset.StandardCharsets.UTF_8).length)
                 .isGreaterThan(contentWithMultiByteCharacters.length());
         verify(documentRepository, never())
-                .findByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY);
+                .findForUpdateByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY);
     }
 
     @Test
@@ -662,7 +662,7 @@ class DocumentDataServiceTest {
                 .build();
 
         when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY)).thenReturn(Optional.of(slot));
-        when(documentRepository.findByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY))
+        when(documentRepository.findForUpdateByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY))
                 .thenReturn(Optional.of(existing));
         when(conflictResolver.supports()).thenReturn(ConflictStrategy.LAST_WRITE_WINS);
         when(conflictResolver.resolve(existingUpdatedAt, existingUpdatedAt)).thenReturn(ConflictDecision.accept());
