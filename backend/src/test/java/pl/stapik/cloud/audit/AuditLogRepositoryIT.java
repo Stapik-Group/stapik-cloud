@@ -111,6 +111,23 @@ class AuditLogRepositoryIT extends AbstractIntegrationTest {
         assertThat(result.getContent()).isEmpty();
     }
 
+    @Test
+    void shouldDeleteOnlyEntriesOlderThanCutoff() {
+        // given
+        Instant cutoff = Instant.now().minusSeconds(3600);
+        createEntry(null, "ACTION_OLD", cutoff.minusSeconds(60));
+        createEntry(null, "ACTION_NEW", cutoff.plusSeconds(60));
+
+        // when
+        int deleted = auditLogRepository.deleteOlderThan(cutoff);
+
+        // then
+        assertThat(deleted).isEqualTo(1);
+        assertThat(auditLogRepository.findAllByOrderByOccurredAtDesc(PageRequest.of(0, 10)).getContent())
+                .extracting(AuditLogEntryData::getAction)
+                .containsExactly("ACTION_NEW");
+    }
+
     private void createEntry(UUID extensionId, String action, Instant occurredAt) {
         AuditLogEntryData entry = AuditLogEntryData.builder()
                 .extensionId(extensionId)
