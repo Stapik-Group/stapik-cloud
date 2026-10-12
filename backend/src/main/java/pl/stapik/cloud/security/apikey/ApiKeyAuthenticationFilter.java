@@ -12,6 +12,7 @@ import pl.stapik.cloud.apikey.data.ApiKeyData;
 import pl.stapik.cloud.apikey.ApiKeyRepository;
 import pl.stapik.cloud.apikey.data.ApiKeyScope;
 import pl.stapik.cloud.common.crypto.HashingService;
+import pl.stapik.cloud.extension.ExtensionRepository;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -23,6 +24,7 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
     private static final int PREFIX_LENGTH = 8;
 
     private final ApiKeyRepository apiKeyRepository;
+    private final ExtensionRepository extensionRepository;
     private final HashingService hashingService;
 
     @Override
@@ -36,6 +38,7 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
             apiKeyRepository.findByKeyPrefixAndRevokedFalse(prefix)
                     .filter(apiKey -> hashingService.matches(rawKey, apiKey.getHashedKey()))
                     .filter(this::notExpired)
+                    .filter(this::extensionEnabled)
                     .ifPresent(this::authenticate);
         }
 
@@ -44,6 +47,10 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
 
     private boolean notExpired(ApiKeyData apiKey) {
         return apiKey.getExpiresAt() == null || apiKey.getExpiresAt().isAfter(Instant.now());
+    }
+
+    private boolean extensionEnabled(ApiKeyData apiKey) {
+        return extensionRepository.existsByIdAndEnabledTrue(apiKey.getExtensionId());
     }
 
     private void authenticate(ApiKeyData apiKey) {

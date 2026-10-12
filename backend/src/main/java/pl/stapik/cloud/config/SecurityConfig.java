@@ -17,6 +17,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.servlet.HandlerExceptionResolver;
 import pl.stapik.cloud.apikey.ApiKeyRepository;
 import pl.stapik.cloud.common.crypto.HashingService;
+import pl.stapik.cloud.extension.ExtensionRepository;
 import pl.stapik.cloud.security.admin.JwtAuthenticationFilter;
 import pl.stapik.cloud.security.admin.JwtService;
 import pl.stapik.cloud.security.apikey.ApiKeyAuthenticationFilter;
@@ -33,10 +34,11 @@ public class SecurityConfig {
     @Autowired
     public SecurityConfig(@Qualifier("handlerExceptionResolver") HandlerExceptionResolver exceptionResolver,
                           ApiKeyRepository apiKeyRepository,
+                          ExtensionRepository extensionRepository,
                           HashingService hashingService,
                           JwtService jwtService) {
         this.exceptionResolver = exceptionResolver;
-        this.apiKeyAuthenticationFilter = new ApiKeyAuthenticationFilter(apiKeyRepository, hashingService);
+        this.apiKeyAuthenticationFilter = new ApiKeyAuthenticationFilter(apiKeyRepository, extensionRepository, hashingService);
         this.jwtAuthenticationFilter = new JwtAuthenticationFilter(jwtService);
     }
 

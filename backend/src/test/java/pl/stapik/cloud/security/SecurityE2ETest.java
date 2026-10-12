@@ -164,6 +164,17 @@ class SecurityE2ETest extends AbstractIntegrationTest {
     }
 
     @Test
+    void apiKeyOfDisabledExtensionIsRejected() throws Exception {
+        String rawKey = insertApiKey(extensionId, "desktop-key", "READ_WRITE", null, false);
+        try (Connection connection = dataSource.getConnection()) {
+            connection.createStatement().execute("UPDATE extension SET enabled = FALSE");
+        }
+
+        mockMvc.perform(get("/api/v1/me").header("x-api-key", rawKey))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void healthIsPubliclyAccessibleWithoutApiKey() throws Exception {
         mockMvc.perform(get("/api/v1/health"))
                 .andExpect(status().isOk())
