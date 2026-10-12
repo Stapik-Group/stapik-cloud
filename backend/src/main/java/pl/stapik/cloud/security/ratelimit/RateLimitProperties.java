@@ -5,8 +5,11 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import java.time.Duration;
 
 @ConfigurationProperties("stapik-cloud.rate-limit")
-public record RateLimitProperties(Login login) {
+public record RateLimitProperties(Login login, ApiKey apiKey) {
 
     public record Login(int ipRequestsPerMinute, int maxFailedAttempts, Duration lockoutDuration) {
+    }
+
+    public record ApiKey(int requestsPerMinute) {
     }
 }

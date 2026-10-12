@@ -22,6 +22,7 @@ import pl.stapik.cloud.security.admin.JwtAuthenticationFilter;
 import pl.stapik.cloud.security.admin.JwtService;
 import pl.stapik.cloud.security.apikey.ApiKeyAuthenticationFilter;
 import pl.stapik.cloud.security.apikey.ApiKeyAuthenticationToken;
+import pl.stapik.cloud.security.ratelimit.ApiKeyRateLimitFilter;
 import pl.stapik.cloud.security.ratelimit.KeyedRateLimiter;
 import pl.stapik.cloud.security.ratelimit.LoginRateLimitFilter;
 import pl.stapik.cloud.security.ratelimit.RateLimitProperties;
@@ -33,6 +34,7 @@ public class SecurityConfig {
     private final HandlerExceptionResolver exceptionResolver;
     private final ApiKeyAuthenticationFilter apiKeyAuthenticationFilter;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final ApiKeyRateLimitFilter apiKeyRateLimitFilter;
     private final LoginRateLimitFilter loginRateLimitFilter;
 
     @Autowired
@@ -45,6 +47,8 @@ public class SecurityConfig {
         this.exceptionResolver = exceptionResolver;
         this.apiKeyAuthenticationFilter = new ApiKeyAuthenticationFilter(apiKeyRepository, extensionRepository, hashingService);
         this.jwtAuthenticationFilter = new JwtAuthenticationFilter(jwtService);
+        this.apiKeyRateLimitFilter = new ApiKeyRateLimitFilter(
+                new KeyedRateLimiter(rateLimitProperties.apiKey().requestsPerMinute()), exceptionResolver);
         this.loginRateLimitFilter = new LoginRateLimitFilter(
                 new KeyedRateLimiter(rateLimitProperties.login().ipRequestsPerMinute()), exceptionResolver);
     }
@@ -67,7 +71,8 @@ public class SecurityConfig {
                         .authenticationEntryPoint(customAuthenticationEntryPoint())
                         .accessDeniedHandler(customAccessDeniedHandler())
                 )
-                .addFilterBefore(apiKeyAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(apiKeyAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(apiKeyRateLimitFilter, ApiKeyAuthenticationFilter.class);
 
         return http.build();
     }

@@ -67,6 +67,8 @@ stapik-cloud:
       ip-requests-per-minute: ${LOGIN_RATE_LIMIT_PER_MINUTE:20}
       max-failed-attempts: ${LOGIN_MAX_FAILED_ATTEMPTS:5}
       lockout-duration: ${LOGIN_LOCKOUT_DURATION:15m}
+    api-key:
+      requests-per-minute: ${API_KEY_RATE_LIMIT_PER_MINUTE:600}
 
 logging:
   level:
