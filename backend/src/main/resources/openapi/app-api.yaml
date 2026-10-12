@@ -29,6 +29,9 @@ paths:
       responses:
         '200':
           description: Current document content
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
@@ -42,9 +45,10 @@ paths:
     put:
       operationId: writeDocument
       tags: [documents]
-      summary: Write document content (last-write-wins, optionally with shadow copy)
+      summary: Write document content (conflict detected via If-Match, optionally with shadow copy)
       parameters:
         - $ref: '#/components/parameters/SlotKeyParam'
+        - $ref: '#/components/parameters/IfMatchParam'
       requestBody:
         required: true
         content:
@@ -54,6 +58,9 @@ paths:
       responses:
         '200':
           description: Saved, returns the current state after the write
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
@@ -66,9 +73,12 @@ paths:
                 $ref: 'common/error.yaml#/components/schemas/Problem'
         '409':
           description: >
-            The write lost against a newer copy in the cloud (last-write-wins) - the
+            If-Match did not match the current ETag - the write lost against a newer copy in the cloud and the
             client's content was saved to history as CONFLICT_DISCARDED if the slot
             has shadow copy enabled.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
@@ -125,6 +135,9 @@ paths:
       responses:
         '200':
           description: Current partition content
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
@@ -148,6 +161,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/SlotKeyParam'
         - $ref: '#/components/parameters/PartitionParam'
+        - $ref: '#/components/parameters/IfMatchParam'
       requestBody:
         required: true
         content:
@@ -157,6 +171,9 @@ paths:
       responses:
         '200':
           description: Saved, returns the current state after the write
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
@@ -175,6 +192,9 @@ paths:
                 $ref: 'common/error.yaml#/components/schemas/Problem'
         '409':
           description: The write lost against a newer copy in the cloud (see writeDocument)
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
@@ -247,6 +267,9 @@ paths:
       responses:
         '200':
           description: Restored
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
@@ -301,6 +324,9 @@ paths:
       responses:
         '200':
           description: Restored
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
@@ -442,7 +468,22 @@ components:
       in: header
       name: x-api-key
 
+  headers:
+    ETag:
+      description: Quoted content hash of the returned document - send it back in If-Match when writing.
+      schema:
+        type: string
+
   parameters:
+    IfMatchParam:
+      name: If-Match
+      in: header
+      required: false
+      description: >
+        ETag of the document version the client last saw (the ETag header of a previous read or write).
+        A missing or stale value on an existing document is a conflict.
+      schema:
+        type: string
     SlotKeyParam:
       name: slotKey
       in: path
@@ -491,14 +532,10 @@ components:
 
     DocumentWriteRequest:
       type: object
-      required: [content, clientLastKnownUpdate]
+      required: [content]
       properties:
         content:
           type: string
-        clientLastKnownUpdate:
-          type: string
-          format: date-time
-          description: Timestamp of the last version known to the client - basis for the last-write-wins comparison.
 
     DocumentVersionResponse:
       type: object

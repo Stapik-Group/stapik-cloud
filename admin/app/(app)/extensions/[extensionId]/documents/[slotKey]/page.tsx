@@ -86,11 +86,11 @@ export default async function DocumentBrowserPage({ params, }: {
                 </div>
                 {isJsonEditable ? (
                     <JsonDocumentEditor
-                        key={document.updatedAt}
+                        key={document.contentHash}
                         extensionId={extensionId}
                         slotKey={slotKey}
                         storedContent={document.content}
-                        lastKnownUpdate={document.updatedAt}
+                        contentHash={document.contentHash}
                     />
                 ) : (
                     <pre className="panel overflow-auto max-h-96 text-sm whitespace-pre-wrap break-all">

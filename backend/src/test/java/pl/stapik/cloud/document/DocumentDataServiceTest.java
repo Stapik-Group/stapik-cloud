@@ -55,6 +55,7 @@ class DocumentDataServiceTest {
     private static final UUID EXTENSION_ID = UUID.randomUUID();
     private static final UUID SLOT_ID = UUID.randomUUID();
     private static final String SLOT_KEY = "slot-key";
+    private static final String EXISTING_HASH = "existing-hash";
 
     @BeforeEach
     void setUp() {
@@ -219,24 +220,25 @@ class DocumentDataServiceTest {
         // given
         DocumentSlotData slot = slot(ConflictStrategy.LAST_WRITE_WINS);
         Instant existingUpdatedAt = Instant.parse("2026-07-18T10:00:00Z");
-        Instant clientLastKnown = Instant.parse("2026-07-18T10:00:00Z");
+        String clientHash = EXISTING_HASH;
 
         DocumentData existing = DocumentData.builder()
                 .id(UUID.randomUUID())
                 .documentSlotId(SLOT_ID)
                 .content("old")
                 .updatedAt(existingUpdatedAt)
+                .contentHash(EXISTING_HASH)
                 .build();
 
         when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY))
                 .thenReturn(Optional.of(slot));
         when(documentRepository.findForUpdateByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.of(existing));
         when(conflictResolver.supports()).thenReturn(ConflictStrategy.LAST_WRITE_WINS);
-        when(conflictResolver.resolve(existingUpdatedAt, clientLastKnown)).thenReturn(ConflictDecision.accept());
+        when(conflictResolver.resolve(EXISTING_HASH, clientHash)).thenReturn(ConflictDecision.accept());
         when(documentRepository.save(any(DocumentData.class))).thenAnswer(inv -> inv.getArgument(0));
 
         // when
-        WriteResult result = documentServiceImpl.write(DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), "new content", clientLastKnown);
+        WriteResult result = documentServiceImpl.write(DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), "new content", clientHash);
 
         // then
         assertThat(result.conflict()).isFalse();
@@ -250,24 +252,25 @@ class DocumentDataServiceTest {
         // given
         DocumentSlotData slot = slot(ConflictStrategy.LAST_WRITE_WINS_WITH_SHADOW_COPY);
         Instant existingUpdatedAt = Instant.parse("2026-07-18T10:00:00Z");
-        Instant clientLastKnown = Instant.parse("2026-07-18T09:00:00Z");
+        String clientHash = "stale-hash";
 
         DocumentData existing = DocumentData.builder()
                 .id(UUID.randomUUID())
                 .documentSlotId(SLOT_ID)
                 .content("current content")
                 .updatedAt(existingUpdatedAt)
+                .contentHash(EXISTING_HASH)
                 .build();
 
         when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY))
                 .thenReturn(Optional.of(slot));
         when(documentRepository.findForUpdateByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.of(existing));
         when(conflictResolver.supports()).thenReturn(ConflictStrategy.LAST_WRITE_WINS_WITH_SHADOW_COPY);
-        when(conflictResolver.resolve(existingUpdatedAt, clientLastKnown))
+        when(conflictResolver.resolve(EXISTING_HASH, clientHash))
                 .thenReturn(new ConflictDecision(false, true));
 
         // when
-        WriteResult result = documentServiceImpl.write(DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), "conflicting content", clientLastKnown);
+        WriteResult result = documentServiceImpl.write(DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), "conflicting content", clientHash);
 
         // then
         assertThat(result.conflict()).isTrue();
@@ -286,24 +289,25 @@ class DocumentDataServiceTest {
         // given
         DocumentSlotData slot = slot(ConflictStrategy.LAST_WRITE_WINS);
         Instant existingUpdatedAt = Instant.parse("2026-07-18T10:00:00Z");
-        Instant clientLastKnown = Instant.parse("2026-07-18T09:00:00Z");
+        String clientHash = "stale-hash";
 
         DocumentData existing = DocumentData.builder()
                 .id(UUID.randomUUID())
                 .documentSlotId(SLOT_ID)
                 .content("current content")
                 .updatedAt(existingUpdatedAt)
+                .contentHash(EXISTING_HASH)
                 .build();
 
         when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY))
                 .thenReturn(Optional.of(slot));
         when(documentRepository.findForUpdateByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.of(existing));
         when(conflictResolver.supports()).thenReturn(ConflictStrategy.LAST_WRITE_WINS);
-        when(conflictResolver.resolve(existingUpdatedAt, clientLastKnown))
+        when(conflictResolver.resolve(EXISTING_HASH, clientHash))
                 .thenReturn(new ConflictDecision(false, false));
 
         // when
-        WriteResult result = documentServiceImpl.write(DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), "conflicting content", clientLastKnown);
+        WriteResult result = documentServiceImpl.write(DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), "conflicting content", clientHash);
 
         // then
         assertThat(result.conflict()).isTrue();
@@ -322,7 +326,7 @@ class DocumentDataServiceTest {
                 .documentSlotId(SLOT_ID)
                 .updatedAt(Instant.now())
                 .build();
-        Instant clientLastKnown = Instant.now();
+        String clientHash = EXISTING_HASH;
 
         when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY))
                 .thenReturn(Optional.of(slot));
@@ -331,7 +335,7 @@ class DocumentDataServiceTest {
 
         // when / then
         DocumentIdentifier documentIdentifier = DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY);
-        assertThatThrownBy(() -> documentServiceImpl.write(documentIdentifier, "content", clientLastKnown))
+        assertThatThrownBy(() -> documentServiceImpl.write(documentIdentifier, "content", clientHash))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("LAST_WRITE_WINS_WITH_SHADOW_COPY");
     }
@@ -470,17 +474,18 @@ class DocumentDataServiceTest {
                 .documentSlotId(SLOT_ID)
                 .content("old")
                 .updatedAt(existingUpdatedAt)
+                .contentHash(EXISTING_HASH)
                 .build();
 
         when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY))
                 .thenReturn(Optional.of(slot));
         when(documentRepository.findForUpdateByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.of(existing));
         when(conflictResolver.supports()).thenReturn(ConflictStrategy.LAST_WRITE_WINS_WITH_SHADOW_COPY);
-        when(conflictResolver.resolve(existingUpdatedAt, existingUpdatedAt)).thenReturn(ConflictDecision.accept());
+        when(conflictResolver.resolve(EXISTING_HASH, EXISTING_HASH)).thenReturn(ConflictDecision.accept());
         when(documentRepository.save(any(DocumentData.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // when
-        documentServiceImpl.write(DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), "new content", existingUpdatedAt);
+        documentServiceImpl.write(DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), "new content", EXISTING_HASH);
 
         // then
         InOrder saveBeforePrune = inOrder(documentVersionRepository);
@@ -494,23 +499,24 @@ class DocumentDataServiceTest {
         int maxVersionsRetained = 5;
         DocumentSlotData slot = slotWithVersionLimit(maxVersionsRetained);
         Instant existingUpdatedAt = Instant.parse("2026-07-18T10:00:00Z");
-        Instant clientLastKnown = Instant.parse("2026-07-18T09:00:00Z");
+        String clientHash = "stale-hash";
         DocumentData existing = DocumentData.builder()
                 .id(UUID.randomUUID())
                 .documentSlotId(SLOT_ID)
                 .content("current content")
                 .updatedAt(existingUpdatedAt)
+                .contentHash(EXISTING_HASH)
                 .build();
 
         when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY))
                 .thenReturn(Optional.of(slot));
         when(documentRepository.findForUpdateByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.of(existing));
         when(conflictResolver.supports()).thenReturn(ConflictStrategy.LAST_WRITE_WINS_WITH_SHADOW_COPY);
-        when(conflictResolver.resolve(existingUpdatedAt, clientLastKnown))
+        when(conflictResolver.resolve(EXISTING_HASH, clientHash))
                 .thenReturn(new ConflictDecision(false, true));
 
         // when
-        documentServiceImpl.write(DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), "conflicting content", clientLastKnown);
+        documentServiceImpl.write(DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), "conflicting content", clientHash);
 
         // then
         verify(documentVersionRepository).deleteAllExceptNewest(existing.getId(), maxVersionsRetained);
@@ -554,6 +560,7 @@ class DocumentDataServiceTest {
                 .documentSlotId(SLOT_ID)
                 .content("old")
                 .updatedAt(existingUpdatedAt)
+                .contentHash(EXISTING_HASH)
                 .build();
 
         when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY))
@@ -563,7 +570,7 @@ class DocumentDataServiceTest {
 
         // when
         DocumentData result = documentServiceImpl.updateContent(
-                DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), "edited by admin", existingUpdatedAt);
+                DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), "edited by admin", EXISTING_HASH);
 
         // then
         assertThat(result.getContent()).isEqualTo("edited by admin");
@@ -583,12 +590,13 @@ class DocumentDataServiceTest {
         // given
         DocumentSlotData slot = slot(ConflictStrategy.LAST_WRITE_WINS);
         Instant existingUpdatedAt = Instant.parse("2026-07-18T10:00:00Z");
-        Instant clientLastKnown = Instant.parse("2026-07-18T09:00:00Z");
+        String clientHash = "stale-hash";
         DocumentData existing = DocumentData.builder()
                 .id(UUID.randomUUID())
                 .documentSlotId(SLOT_ID)
                 .content("current content")
                 .updatedAt(existingUpdatedAt)
+                .contentHash(EXISTING_HASH)
                 .build();
 
         when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY))
@@ -597,7 +605,7 @@ class DocumentDataServiceTest {
 
         // when / then
         DocumentIdentifier documentIdentifier = DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY);
-        assertThatThrownBy(() -> documentServiceImpl.updateContent(documentIdentifier, "edited by admin", clientLastKnown))
+        assertThatThrownBy(() -> documentServiceImpl.updateContent(documentIdentifier, "edited by admin", clientHash))
                 .isInstanceOf(DocumentModifiedException.class)
                 .hasMessageContaining(SLOT_KEY);
 
@@ -615,8 +623,8 @@ class DocumentDataServiceTest {
 
         // when / then
         DocumentIdentifier documentIdentifier = DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY);
-        Instant instantNow = Instant.now();
-        assertThatThrownBy(() -> documentServiceImpl.updateContent(documentIdentifier, "content", instantNow))
+        String clientHash = EXISTING_HASH;
+        assertThatThrownBy(() -> documentServiceImpl.updateContent(documentIdentifier, "content", clientHash))
                 .isInstanceOf(NoSuchElementException.class);
 
         verify(documentRepository, never()).save(any());
@@ -636,7 +644,7 @@ class DocumentDataServiceTest {
 
         // when
         WriteResult result = documentServiceImpl.write(
-                DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY, partitionKey), contentWithMultiByteCharacters, Instant.now());
+                DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY, partitionKey), contentWithMultiByteCharacters, null);
 
         // then
         assertThat(result.conflict()).isFalse();
@@ -659,18 +667,19 @@ class DocumentDataServiceTest {
                 .content("old")
                 .sizeBytes(3)
                 .updatedAt(existingUpdatedAt)
+                .contentHash(EXISTING_HASH)
                 .build();
 
         when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY)).thenReturn(Optional.of(slot));
         when(documentRepository.findForUpdateByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY))
                 .thenReturn(Optional.of(existing));
         when(conflictResolver.supports()).thenReturn(ConflictStrategy.LAST_WRITE_WINS);
-        when(conflictResolver.resolve(existingUpdatedAt, existingUpdatedAt)).thenReturn(ConflictDecision.accept());
+        when(conflictResolver.resolve(EXISTING_HASH, EXISTING_HASH)).thenReturn(ConflictDecision.accept());
         when(documentRepository.save(any(DocumentData.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // when
         DocumentData result = documentServiceImpl.write(
-                DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), "new content", existingUpdatedAt).documentData();
+                DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), "new content", EXISTING_HASH).documentData();
 
         // then
         assertThat(result.getSizeBytes()).isEqualTo("new content".length());

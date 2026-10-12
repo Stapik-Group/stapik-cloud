@@ -24,17 +24,17 @@ public class AdminDocumentDelegate implements AdminDocumentsApiDelegate {
     @Override
     public ResponseEntity<AdminDocumentResponse> getDocumentContent(UUID extensionId, String slotKey) {
         DocumentData document = documentService.getCurrent(DocumentIdentifier.of(extensionId, slotKey));
-        return ResponseEntity.ok(documentMapper.toAdminDocumentResponse(document, slotKey));
+        return adminDocumentResponse(document, slotKey);
     }
 
     @Override
-    public ResponseEntity<AdminDocumentResponse> updateDocumentContent(UUID extensionId, String slotKey, AdminDocumentWriteRequest request) {
+    public ResponseEntity<AdminDocumentResponse> updateDocumentContent(UUID extensionId, String slotKey, AdminDocumentWriteRequest request, String ifMatch) {
         DocumentData updated = documentService.updateContent(
                 DocumentIdentifier.of(extensionId, slotKey),
                 request.getContent(),
-                request.getClientLastKnownUpdate().toInstant()
+                DocumentETag.parse(ifMatch)
         );
-        return ResponseEntity.ok(documentMapper.toAdminDocumentResponse(updated, slotKey));
+        return adminDocumentResponse(updated, slotKey);
     }
 
     @Override
@@ -49,6 +49,12 @@ public class AdminDocumentDelegate implements AdminDocumentsApiDelegate {
     @Override
     public ResponseEntity<AdminDocumentResponse> restoreDocumentVersionAdmin(UUID extensionId, String slotKey, UUID versionId) {
         DocumentData restored = documentService.restoreVersion(DocumentIdentifier.of(extensionId, slotKey), versionId);
-        return ResponseEntity.ok(documentMapper.toAdminDocumentResponse(restored, slotKey));
+        return adminDocumentResponse(restored, slotKey);
+    }
+
+    private ResponseEntity<AdminDocumentResponse> adminDocumentResponse(DocumentData documentData, String slotKey) {
+        return ResponseEntity.ok()
+                .eTag(DocumentETag.format(documentData.getContentHash()))
+                .body(documentMapper.toAdminDocumentResponse(documentData, slotKey));
     }
 }

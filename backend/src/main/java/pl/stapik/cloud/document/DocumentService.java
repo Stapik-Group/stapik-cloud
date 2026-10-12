@@ -6,16 +6,15 @@ import pl.stapik.cloud.document.dto.DocumentIdentifier;
 import pl.stapik.cloud.document.dto.DocumentPartitionSummary;
 import pl.stapik.cloud.document.dto.WriteResult;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
 public interface DocumentService {
     DocumentData getCurrent(DocumentIdentifier identifier);
     List<DocumentVersionData> listVersions(DocumentIdentifier identifier);
-    WriteResult write(DocumentIdentifier identifier, String content, Instant clientLastKnownUpdate);
+    WriteResult write(DocumentIdentifier identifier, String content, String clientContentHash);
     DocumentData restoreVersion(DocumentIdentifier identifier, UUID versionId);
-    DocumentData updateContent(DocumentIdentifier identifier, String content, Instant clientLastKnownUpdate);
+    DocumentData updateContent(DocumentIdentifier identifier, String content, String clientContentHash);
     void delete(DocumentIdentifier identifier);
     List<DocumentPartitionSummary> listPartitions(DocumentIdentifier identifier);
 }

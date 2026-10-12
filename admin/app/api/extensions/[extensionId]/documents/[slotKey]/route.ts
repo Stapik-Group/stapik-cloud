@@ -21,10 +21,15 @@ export async function PUT(
 ) {
     const { extensionId, slotKey } = await params;
     const body = await request.json();
+    const ifMatch = request.headers.get("If-Match");
 
     const backendResponse = await adminApiFetch(
         `/api/admin/extensions/${extensionId}/documents/${slotKey}`,
-        { method: "PUT", body: JSON.stringify(body) },
+        {
+            method: "PUT",
+            body: JSON.stringify(body),
+            headers: ifMatch ? { "If-Match": ifMatch } : undefined,
+        },
     );
 
     const data = await backendResponse.json().catch(() => null);

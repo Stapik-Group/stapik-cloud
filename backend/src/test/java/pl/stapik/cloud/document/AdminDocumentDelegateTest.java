@@ -17,6 +17,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -26,6 +27,7 @@ class AdminDocumentDelegateTest extends AbstractIntegrationTest {
     private static final String SLOT_KEY = "calendar.json";
     private static final String DOCUMENT_URL = "/api/admin/extensions/{extensionId}/documents/{slotKey}";
     private static final Instant DOCUMENT_UPDATED_AT = Instant.parse("2026-07-18T10:00:00Z");
+    private static final String DOCUMENT_ETAG = "\"hash-initial\"";
     private static final String AUDIT_ACTION = "DOCUMENT_CONTENT_EDITED";
 
     @Autowired
@@ -57,13 +59,15 @@ class AdminDocumentDelegateTest extends AbstractIntegrationTest {
     @Test
     void shouldUpdateDocumentContentSuccessfully() throws Exception {
         // given
-        String requestBody = writeRequestBody("{\\\"foo\\\": \\\"edited\\\"}", DOCUMENT_UPDATED_AT.toString());
+        String requestBody = writeRequestBody("{\\\"foo\\\": \\\"edited\\\"}");
 
         // when & then
         mockMvc.perform(put(DOCUMENT_URL, extensionId, SLOT_KEY)
+                        .header("If-Match", DOCUMENT_ETAG)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andExpect(status().isOk())
+                .andExpect(header().exists("ETag"))
                 .andExpect(jsonPath("$.slotKey").value(SLOT_KEY))
                 .andExpect(jsonPath("$.content").value("{\"foo\": \"edited\"}"));
 
@@ -75,11 +79,11 @@ class AdminDocumentDelegateTest extends AbstractIntegrationTest {
     @Test
     void shouldReturnConflictWhenDocumentChangedAfterEditorLoadedIt() throws Exception {
         // given
-        String staleLastKnownUpdate = DOCUMENT_UPDATED_AT.minusSeconds(60).toString();
-        String requestBody = writeRequestBody("edited", staleLastKnownUpdate);
+        String requestBody = writeRequestBody("edited");
 
         // when & then
         mockMvc.perform(put(DOCUMENT_URL, extensionId, SLOT_KEY)
+                        .header("If-Match", "\"hash-stale\"")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andExpect(status().isConflict());
@@ -92,31 +96,32 @@ class AdminDocumentDelegateTest extends AbstractIntegrationTest {
     @Test
     void shouldReturnNotFoundWhenSlotDoesNotExistOnUpdate() throws Exception {
         // given
-        String requestBody = writeRequestBody("edited", DOCUMENT_UPDATED_AT.toString());
+        String requestBody = writeRequestBody("edited");
 
         // when & then
         mockMvc.perform(put(DOCUMENT_URL, extensionId, "missing-slot")
+                        .header("If-Match", DOCUMENT_ETAG)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andExpect(status().isNotFound());
     }
 
     @Test
-    void shouldReturnBadRequestWhenClientLastKnownUpdateIsMissing() throws Exception {
+    void shouldReturnConflictWhenIfMatchIsMissing() throws Exception {
         // given
-        String requestBody = "{\"content\": \"edited\"}";
+        String requestBody = writeRequestBody("edited");
 
         // when & then
         mockMvc.perform(put(DOCUMENT_URL, extensionId, SLOT_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isConflict());
 
         assertThat(readContent(documentId)).isEqualTo("{\"foo\": \"bar\"}");
     }
 
-    private String writeRequestBody(String escapedContent, String clientLastKnownUpdate) {
-        return "{\"content\": \"" + escapedContent + "\", \"clientLastKnownUpdate\": \"" + clientLastKnownUpdate + "\"}";
+    private String writeRequestBody(String escapedContent) {
+        return "{\"content\": \"" + escapedContent + "\"}";
     }
 
     private String readContent(UUID id) throws Exception {

@@ -46,12 +46,12 @@ export function JsonDocumentEditor({
                                        extensionId,
                                        slotKey,
                                        storedContent,
-                                       lastKnownUpdate,
+                                       contentHash,
                                    }: {
     extensionId: string;
     slotKey: string;
     storedContent: string;
-    lastKnownUpdate: string;
+    contentHash: string;
 }) {
     const router = useRouter();
     const { t } = useTranslation();
@@ -123,10 +123,8 @@ export function JsonDocumentEditor({
         try {
             const response = await fetch(`/api/extensions/${extensionId}/documents/${slotKey}`, {
                 method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                // lastKnownUpdate must be passed back as the exact string received from the API:
-                // parsing it into a Date would cut microseconds and cause false conflicts.
-                body: JSON.stringify({ content: text, clientLastKnownUpdate: lastKnownUpdate }),
+                headers: { "Content-Type": "application/json", "If-Match": `"${contentHash}"` },
+                body: JSON.stringify({ content: text }),
             });
 
             if (response.status === 409) {

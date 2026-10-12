@@ -40,13 +40,13 @@ public class DocumentDelegate implements DocumentsApiDelegate {
     }
 
     @Override
-    public ResponseEntity<DocumentResponse> writeDocument(String slotKey, DocumentWriteRequest documentWriteRequest) {
-        return saveDocument(DocumentIdentifier.of(currentExtensionId(), slotKey), documentWriteRequest);
+    public ResponseEntity<DocumentResponse> writeDocument(String slotKey, DocumentWriteRequest documentWriteRequest, String ifMatch) {
+        return saveDocument(DocumentIdentifier.of(currentExtensionId(), slotKey), documentWriteRequest, ifMatch);
     }
 
     @Override
-    public ResponseEntity<DocumentResponse> writeDocumentPartition(String slotKey, String partition, DocumentWriteRequest documentWriteRequest) {
-        return saveDocument(DocumentIdentifier.of(currentExtensionId(), slotKey, partition), documentWriteRequest);
+    public ResponseEntity<DocumentResponse> writeDocumentPartition(String slotKey, String partition, DocumentWriteRequest documentWriteRequest, String ifMatch) {
+        return saveDocument(DocumentIdentifier.of(currentExtensionId(), slotKey, partition), documentWriteRequest, ifMatch);
     }
 
     @Override
@@ -90,20 +90,17 @@ public class DocumentDelegate implements DocumentsApiDelegate {
 
     private ResponseEntity<DocumentResponse> readDocument(DocumentIdentifier identifier) {
         DocumentData documentData = documentService.getCurrent(identifier);
-        return ResponseEntity.ok(documentMapper.toResponse(documentData, identifier.getSlotKey()));
+        return documentResponse(200, documentData, identifier.getSlotKey());
     }
 
-    private ResponseEntity<DocumentResponse> saveDocument(DocumentIdentifier identifier, DocumentWriteRequest documentWriteRequest) {
+    private ResponseEntity<DocumentResponse> saveDocument(DocumentIdentifier identifier, DocumentWriteRequest documentWriteRequest, String ifMatch) {
         WriteResult result = documentService.write(
                 identifier,
                 documentWriteRequest.getContent(),
-                documentWriteRequest.getClientLastKnownUpdate().toInstant()
+                DocumentETag.parse(ifMatch)
         );
 
-        DocumentResponse response = documentMapper.toResponse(result.documentData(), identifier.getSlotKey());
-        return result.conflict()
-                ? ResponseEntity.status(409).body(response)
-                : ResponseEntity.ok(response);
+        return documentResponse(result.conflict() ? 409 : 200, result.documentData(), identifier.getSlotKey());
     }
 
     private ResponseEntity<Void> removeDocument(DocumentIdentifier identifier) {
@@ -121,7 +118,13 @@ public class DocumentDelegate implements DocumentsApiDelegate {
 
     private ResponseEntity<DocumentResponse> restoreVersion(DocumentIdentifier identifier, UUID versionId) {
         DocumentData restored = documentService.restoreVersion(identifier, versionId);
-        return ResponseEntity.ok(documentMapper.toResponse(restored, identifier.getSlotKey()));
+        return documentResponse(200, restored, identifier.getSlotKey());
+    }
+
+    private ResponseEntity<DocumentResponse> documentResponse(int status, DocumentData documentData, String slotKey) {
+        return ResponseEntity.status(status)
+                .eTag(DocumentETag.format(documentData.getContentHash()))
+                .body(documentMapper.toResponse(documentData, slotKey));
     }
 
     private UUID currentExtensionId() {

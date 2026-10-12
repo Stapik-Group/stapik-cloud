@@ -10,6 +10,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import pl.stapik.cloud.AbstractIntegrationTest;
 
 import javax.sql.DataSource;
@@ -69,6 +70,7 @@ class DocumentDataDelegateTest extends AbstractIntegrationTest {
                         .header(API_KEY_HEADER, rawApiKey))
                 .andExpect(status().isOk())
                 .andExpect(content().json(expectedResponseBody, JsonCompareMode.LENIENT))
+                .andExpect(header().string("ETag", "\"hash1\""))
                 .andExpect(jsonPath("$.slotKey").value("notes"))
                 .andExpect(jsonPath("$.content").value("hello world"));
     }
@@ -105,7 +107,26 @@ class DocumentDataDelegateTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(content().json(expectedResponseBody, JsonCompareMode.LENIENT))
                 .andExpect(jsonPath("$.contentHash").isNotEmpty())
+                .andExpect(header().exists("ETag"))
                 .andExpect(jsonPath("$.updatedAt").isNotEmpty());
+    }
+
+    @Test
+    void shouldOverwriteExistingDocumentWhenIfMatchEqualsCurrentETag() throws Exception {
+        // given
+        UUID slotId = UUID.randomUUID();
+        insertDocumentSlot(slotId, extensionId, "etag-slot");
+        insertDocument(slotId, "server content", "hash-server");
+
+        // when & then
+        mockMvc.perform(put("/api/v1/documents/{slotKey}", "etag-slot")
+                        .header(API_KEY_HEADER, rawApiKey)
+                        .header("If-Match", "\"hash-server\"")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\": \"client content\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").value("client content"))
+                .andExpect(header().exists("ETag"));
     }
 
     @Test
@@ -133,9 +154,11 @@ class DocumentDataDelegateTest extends AbstractIntegrationTest {
         // when & then
         mockMvc.perform(put("/api/v1/documents/{slotKey}", "conflict-slot")
                         .header(API_KEY_HEADER, rawApiKey)
+                        .header("If-Match", "\"hash-stale\"")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andExpect(status().isConflict())
+                .andExpect(header().string("ETag", "\"hash-server\""))
                 .andExpect(jsonPath("$.content").value("server content"));
     }
 
@@ -189,13 +212,7 @@ class DocumentDataDelegateTest extends AbstractIntegrationTest {
 
         // when
         for (int writeNumber = 1; writeNumber <= writesCount; writeNumber++) {
-            String requestBody = "{\"content\": \"content-" + writeNumber + "\", "
-                    + "\"clientLastKnownUpdate\": \"2999-01-01T00:00:00Z\"}";
-            mockMvc.perform(put("/api/v1/documents/{slotKey}", "limited-slot")
-                            .header(API_KEY_HEADER, rawApiKey)
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(requestBody))
-                    .andExpect(status().isOk());
+            putDocument("/api/v1/documents/{slotKey}", "content-" + writeNumber, "limited-slot");
         }
 
         // then
@@ -389,12 +406,16 @@ class DocumentDataDelegateTest extends AbstractIntegrationTest {
     }
 
     private void putDocument(String urlTemplate, String content, Object... urlVariables) throws Exception {
-        String requestBody = "{\"content\": \"" + content + "\", \"clientLastKnownUpdate\": \"2999-01-01T00:00:00Z\"}";
-        mockMvc.perform(put(urlTemplate, urlVariables)
-                        .header(API_KEY_HEADER, rawApiKey)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody))
-                .andExpect(status().isOk());
+        String currentETag = mockMvc.perform(get(urlTemplate, urlVariables).header(API_KEY_HEADER, rawApiKey))
+                .andReturn().getResponse().getHeader("ETag");
+        MockHttpServletRequestBuilder request = put(urlTemplate, urlVariables)
+                .header(API_KEY_HEADER, rawApiKey)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"content\": \"" + content + "\"}");
+        if (currentETag != null) {
+            request.header("If-Match", currentETag);
+        }
+        mockMvc.perform(request).andExpect(status().isOk());
     }
 
     private void insertExtension(UUID id) throws Exception {

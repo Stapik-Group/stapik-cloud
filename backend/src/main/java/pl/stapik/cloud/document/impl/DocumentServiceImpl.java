@@ -55,7 +55,7 @@ public class DocumentServiceImpl implements DocumentService {
 
     @Transactional
     @Override
-    public WriteResult write(DocumentIdentifier identifier, String content, Instant clientLastKnownUpdate) {
+    public WriteResult write(DocumentIdentifier identifier, String content, String clientContentHash) {
         DocumentSlotData slot = requireSlot(identifier);
         Optional<DocumentData> rawExisting = documentRepository
                 .findForUpdateByDocumentSlotIdAndPartitionKey(slot.getId(), identifier.getPartitionKey());
@@ -72,7 +72,7 @@ public class DocumentServiceImpl implements DocumentService {
 
         DocumentData existing = activeExisting.get();
         ConflictResolver resolver = resolverFor(slot.getConflictStrategy());
-        ConflictDecision decision = resolver.resolve(existing.getUpdatedAt(), clientLastKnownUpdate);
+        ConflictDecision decision = resolver.resolve(existing.getContentHash(), clientContentHash);
 
         if (!decision.writeAccepted()) {
             if (decision.preserveDiscardedVersion()) {
@@ -105,11 +105,11 @@ public class DocumentServiceImpl implements DocumentService {
     @Transactional
     @Override
     @Auditing(action = AuditAction.DOCUMENT_CONTENT_EDITED)
-    public DocumentData updateContent(DocumentIdentifier identifier, String content, Instant clientLastKnownUpdate) {
+    public DocumentData updateContent(DocumentIdentifier identifier, String content, String clientContentHash) {
         DocumentSlotData slot = requireSlot(identifier);
         DocumentData existing = requireCurrentDocumentForUpdate(slot, identifier);
 
-        if (clientLastKnownUpdate.isBefore(existing.getUpdatedAt())) {
+        if (!existing.getContentHash().equals(clientContentHash)) {
             throw new DocumentModifiedException(slot.getSlotKey());
         }
 

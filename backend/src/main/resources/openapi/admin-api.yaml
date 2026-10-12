@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Stapik Cloud - Admin API
-  version: 1.0.2
+  version: 1.0.3
   description: >
     Admin panel API (React) - login, extension wizard, slot/key management, document
     browser, audit log. Authentication: JWT (Bearer), fully separated from client
@@ -303,6 +303,9 @@ paths:
       responses:
         '200':
           description: Document content
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
@@ -316,6 +319,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/ExtensionIdParam'
         - $ref: '#/components/parameters/SlotKeyPathParam'
+        - $ref: '#/components/parameters/IfMatchParam'
       requestBody:
         required: true
         content:
@@ -325,6 +329,9 @@ paths:
       responses:
         '200':
           description: Document content updated
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
@@ -338,7 +345,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          description: Document was modified after the supplied clientLastKnownUpdate
+          description: If-Match is missing or does not match the current document ETag
 
   /extensions/{extensionId}/documents/{slotKey}/versions:
     get:
@@ -373,6 +380,9 @@ paths:
       responses:
         '200':
           description: Restored
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
@@ -414,7 +424,21 @@ components:
       scheme: bearer
       bearerFormat: JWT
 
+  headers:
+    ETag:
+      description: Quoted content hash of the returned document - send it back in If-Match when editing.
+      schema:
+        type: string
+
   parameters:
+    IfMatchParam:
+      name: If-Match
+      in: header
+      required: false
+      description: >
+        ETag of the document version the editor loaded. A missing or stale value is a conflict.
+      schema:
+        type: string
     ExtensionIdParam:
       name: extensionId
       in: path
@@ -632,11 +656,13 @@ components:
 
     AdminDocumentResponse:
       type: object
-      required: [slotKey, content, updatedAt]
+      required: [slotKey, content, contentHash, updatedAt]
       properties:
         slotKey:
           type: string
         content:
+          type: string
+        contentHash:
           type: string
         updatedAt:
           type: string
@@ -644,13 +670,10 @@ components:
 
     AdminDocumentWriteRequest:
       type: object
-      required: [content, clientLastKnownUpdate]
+      required: [content]
       properties:
         content:
           type: string
-        clientLastKnownUpdate:
-          type: string
-          format: date-time
 
     AdminDocumentVersionListResponse:
       type: object
