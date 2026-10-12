@@ -478,7 +478,7 @@ else
   echo "Done. Stapik Cloud is running in LXC ${CTID} (${HOSTNAME})."
 fi
 echo "Container IP: ${CONTAINER_IP}"
-echo "Backend:      http://${CONTAINER_IP}:8080"
+echo "Backend:      http://127.0.0.1:8080 (inside the container only - expose it through a reverse proxy)"
 echo "Admin panel:  http://${CONTAINER_IP}:3000"
 if [ -n "${BACKUP_VOLID}" ]; then
   echo ""
