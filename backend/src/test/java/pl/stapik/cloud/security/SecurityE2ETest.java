@@ -140,6 +140,30 @@ class SecurityE2ETest extends AbstractIntegrationTest {
     }
 
     @Test
+    void viewerAdminCanReadButCannotWrite() throws Exception {
+        String viewerToken = jwtService.generateToken(UUID.randomUUID(), "viewer", "VIEWER");
+
+        mockMvc.perform(get("/api/admin/extensions").header("Authorization", "Bearer " + viewerToken))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/admin/extensions/" + extensionId + "/keys")
+                        .header("Authorization", "Bearer " + viewerToken)
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(delete("/api/admin/extensions/" + extensionId)
+                        .header("Authorization", "Bearer " + viewerToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void ownerAdminPassesWriteAuthorization() throws Exception {
+        String ownerToken = jwtService.generateToken(UUID.randomUUID(), "owner", "OWNER");
+
+        mockMvc.perform(delete("/api/admin/extensions/" + UUID.randomUUID())
+                        .header("Authorization", "Bearer " + ownerToken))
+                .andExpect(result -> assertNotEquals(403, result.getResponse().getStatus()));
+    }
+
+    @Test
     void healthIsPubliclyAccessibleWithoutApiKey() throws Exception {
         mockMvc.perform(get("/api/v1/health"))
                 .andExpect(status().isOk())

@@ -66,15 +66,21 @@ public class SecurityConfig {
     @Bean
     @Order(2)
     public SecurityFilterChain adminApiFilterChain(HttpSecurity http) {
+        final String apiAdminAllPattern = "/api/admin/**";
+
         http
-                .securityMatcher("/api/admin/**")
+                .securityMatcher(apiAdminAllPattern)
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/admin/auth/login", "/api/admin/auth/refresh", "/api/admin/auth/logout").permitAll()
-                        .anyRequest().authenticated())
+                        .requestMatchers(HttpMethod.GET, apiAdminAllPattern).authenticated()
+                        .requestMatchers(HttpMethod.HEAD, apiAdminAllPattern).authenticated()
+                        .requestMatchers(HttpMethod.OPTIONS, apiAdminAllPattern).authenticated()
+                        .anyRequest().hasRole("OWNER"))
                 .exceptionHandling(exceptions -> exceptions
-                        .authenticationEntryPoint(customAuthenticationEntryPoint()))
+                        .authenticationEntryPoint(customAuthenticationEntryPoint())
+                        .accessDeniedHandler(customAccessDeniedHandler()))
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
