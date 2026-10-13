@@ -56,6 +56,12 @@ bash <(curl -fsSL https://raw.githubusercontent.com/Stapik-Group/stapik-cloud/ma
 
 Running the same command again updates an existing installation (checks out the newest release, pulls its prebuilt images from the registry, restarts). Use `VERSION=v1.2.0 bash deploy.sh` to deploy a specific release without touching existing secrets or data.
 
+## CI and releases
+
+- Pull requests into `main`/`master` run the backend tests (Testcontainers), the admin lint and build (with API types generated from the OpenAPI spec), validation of the deploy files, and a build plus Trivy scan of both Docker images. Plain pushes to branches run nothing.
+- Pushing a tag `vX.Y.Z` runs the same checks, then publishes the images `ghcr.io/<owner>/stapik-cloud-backend` and `ghcr.io/<owner>/stapik-cloud-admin` (tags `X.Y.Z` and `X.Y`) and creates a GitHub release with the backend jar, the admin build, the deploy files and `SHA256SUMS`. Tags with a suffix (`v1.3.0-rc1`) are marked as pre-releases.
+- The first time, set both packages to public in the GitHub package settings, otherwise the server needs `docker login ghcr.io` to pull them.
+
 See [`deploy/README.md`](deploy/README.md) for the full walkthrough, configuration, and security notes.
 
 ## API
