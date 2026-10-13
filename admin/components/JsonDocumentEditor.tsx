@@ -3,44 +3,8 @@
 import { useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/LocaleProvider";
-import { INDENT, indentSelection, outdentSelection } from "@/lib/text-indent";
-
-function removeWhitespaceOutsideStrings(json: string): string {
-    let result = "";
-    let isInsideString = false;
-    let isEscaped = false;
-
-    for (const character of json) {
-        if (isInsideString) {
-            result += character;
-            if (isEscaped) {
-                isEscaped = false;
-            } else if (character === "\\") {
-                isEscaped = true;
-            } else if (character === "\"") {
-                isInsideString = false;
-            }
-        } else if (character === "\"") {
-            isInsideString = true;
-            result += character;
-        } else if (!/\s/.test(character)) {
-            result += character;
-        }
-    }
-
-    return result;
-}
-
-function formatForEditing(rawContent: string): string {
-    try {
-        const prettyContent = JSON.stringify(JSON.parse(rawContent), null, INDENT);
-        const isLossless =
-            removeWhitespaceOutsideStrings(prettyContent) === removeWhitespaceOutsideStrings(rawContent);
-        return isLossless ? prettyContent : rawContent;
-    } catch {
-        return rawContent;
-    }
-}
+import { formatForEditing } from "@/lib/json-format";
+import { indentSelection, outdentSelection } from "@/lib/text-indent";
 
 export function JsonDocumentEditor({
                                        extensionId,

@@ -7,7 +7,7 @@ A self-hosted backend for the Stapik ecosystem of apps — document storage with
 - **Document slots** — per-extension key-value document storage (`JSON`, `TEXT`, `BINARY`, `BINARY_COLLECTION`), with configurable versioning and per-slot size limits
 - **Document partitions** — a slot can hold named partitions (e.g. one per year) next to its main document; each partition has its own content, version history and conflict handling, so large documents can be split and old parts fetched on demand
 - **Conflict resolution** — last-write-wins, optionally with a shadow copy preserving the discarded write-in version history
-- **Version history** — every write is recorded; restore any previous version as the current document
+- **Version history** — every write is recorded; restore any previous version as the current document, or compare two versions with a structural JSON diff
 - **Binary assets** — file upload/download/list per document slot, backed by local filesystem storage
 - **API key authentication** — per-extension API keys (Argon2id-hashed, prefix lookup, read-only/read-write scopes) for app-facing endpoints
 - **Admin panel** — Next.js interface (JWT-secured) to manage extensions, document slots, API keys, browse document content and version history, and inspect the audit log
