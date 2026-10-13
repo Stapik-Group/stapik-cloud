@@ -22,6 +22,7 @@ tags:
   - name: keys
   - name: admin-documents
   - name: audit-log
+  - name: dashboard
 
 paths:
   /auth/login:
@@ -792,6 +793,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/AuditLogPageResponse'
 
+  /dashboard/stats:
+    get:
+      operationId: getDashboardStats
+      tags: [dashboard]
+      summary: Aggregated numbers for the admin dashboard
+      responses:
+        '200':
+          description: Dashboard statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardStatsResponse'
+
 components:
   securitySchemes:
     BearerAuth:
@@ -1363,6 +1377,96 @@ components:
         size:
           type: integer
         totalElements:
+          type: integer
+          format: int64
+
+    DashboardStatsResponse:
+      type: object
+      required: [documentStorageBytes, assetStorageBytes, documentCount, assetCount, apiKeyActivity, recentConflicts, writesPerDay]
+      properties:
+        documentStorageBytes:
+          type: integer
+          format: int64
+        assetStorageBytes:
+          type: integer
+          format: int64
+        documentCount:
+          type: integer
+          format: int64
+        assetCount:
+          type: integer
+          format: int64
+        apiKeyActivity:
+          type: array
+          description: Active API keys, most recently used first.
+          items:
+            $ref: '#/components/schemas/DashboardApiKeyActivity'
+        recentConflicts:
+          type: array
+          description: Most recent writes discarded by a conflict, newest first.
+          items:
+            $ref: '#/components/schemas/DashboardConflict'
+        writesPerDay:
+          type: array
+          description: Retained document writes per UTC day for the last 30 days, oldest first, days without writes included.
+          items:
+            $ref: '#/components/schemas/DashboardDailyWrites'
+
+    DashboardApiKeyActivity:
+      type: object
+      required: [id, label, keyPrefix, scope, extensionId, extensionName]
+      properties:
+        id:
+          type: string
+          format: uuid
+        label:
+          type: string
+        keyPrefix:
+          type: string
+        scope:
+          $ref: '#/components/schemas/ApiKeyScope'
+        extensionId:
+          type: string
+          format: uuid
+        extensionName:
+          type: string
+        lastUsedAt:
+          type: string
+          format: date-time
+          description: Absent when the key has never been used.
+
+    DashboardConflict:
+      type: object
+      required: [versionId, extensionId, extensionName, slotKey, savedAt]
+      properties:
+        versionId:
+          type: string
+          format: uuid
+        extensionId:
+          type: string
+          format: uuid
+        extensionName:
+          type: string
+        slotKey:
+          type: string
+        partition:
+          type: string
+          description: Absent for the main document of the slot.
+        deviceLabel:
+          type: string
+          description: Label of the API key whose write was discarded.
+        savedAt:
+          type: string
+          format: date-time
+
+    DashboardDailyWrites:
+      type: object
+      required: [date, count]
+      properties:
+        date:
+          type: string
+          format: date
+        count:
           type: integer
           format: int64
 

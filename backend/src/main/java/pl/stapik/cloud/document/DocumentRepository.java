@@ -53,4 +53,9 @@ public interface DocumentRepository extends JpaRepository<DocumentData, UUID> {
             ORDER BY document.updatedAt, slot.slotKey, document.partitionKey
             """)
     List<DocumentChangeSummary> findChanges(@Param("extensionId") UUID extensionId, @Param("since") Instant since);
+
+    @Query("SELECT COALESCE(SUM(document.sizeBytes), 0) FROM DocumentData document WHERE document.deletedAt IS NULL")
+    long sumActiveSizeBytes();
+
+    long countByDeletedAtIsNull();
 }
