@@ -47,6 +47,16 @@ jobs:
         env:
           NEXT_TELEMETRY_DISABLED: "1"
 
+  dependency-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan dependencies for HIGH and CRITICAL vulnerabilities
+        run: |
+          docker run --rm -v "$PWD:/src:ro" aquasec/trivy:0.58.1 fs \
+            --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed \
+            --skip-dirs node_modules --skip-dirs target --exit-code 1 /src
+
   deploy-files:
     runs-on: ubuntu-latest
     steps:

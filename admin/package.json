@@ -1,6 +1,6 @@
 {
   "name": "admin",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -10,9 +10,14 @@
     "generate:api-types": "openapi-typescript ../backend/src/main/resources/openapi/admin-api.yaml -o lib/api-types.ts --default-non-nullable false"
   },
   "dependencies": {
-    "next": "16.2.10",
+    "next": "16.3.8",
     "react": "19.2.4",
     "react-dom": "19.2.4"
+  },
+  "overrides": {
+    "nanoid": "^3.3.18",
+    "sharp": "^0.35.5",
+    "source-map-js": "^1.2.2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -20,7 +25,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.2.10",
+    "eslint-config-next": "16.3.8",
     "openapi-typescript": "^7.13.0",
     "tailwindcss": "^4",
     "typescript": "^5"

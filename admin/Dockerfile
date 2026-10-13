@@ -25,7 +25,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN addgroup -S nextjs && adduser -S nextjs -G nextjs
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx \
+    && addgroup -S nextjs && adduser -S nextjs -G nextjs
 
 # Wymaga next.config.ts z "output: 'standalone'"
 COPY --from=build --chown=nextjs:nextjs /app/.next/standalone ./
