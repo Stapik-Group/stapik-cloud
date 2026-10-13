@@ -19,6 +19,30 @@ class KeyedRateLimiterTest {
     }
 
     @Test
+    void shouldReportLimitAndRemainingRequests() {
+        KeyedRateLimiter limiter = new KeyedRateLimiter(3);
+
+        RateLimitDecision first = limiter.consume("key");
+        RateLimitDecision second = limiter.consume("key");
+
+        assertThat(first.limit()).isEqualTo(3);
+        assertThat(first.remaining()).isEqualTo(2);
+        assertThat(second.remaining()).isEqualTo(1);
+        assertThat(second.resetAfterSeconds()).isPositive();
+    }
+
+    @Test
+    void shouldReportNoRemainingRequestsWhenRejected() {
+        KeyedRateLimiter limiter = new KeyedRateLimiter(1);
+        limiter.consume("key");
+
+        RateLimitDecision rejected = limiter.consume("key");
+
+        assertThat(rejected.remaining()).isZero();
+        assertThat(rejected.limit()).isEqualTo(1);
+    }
+
+    @Test
     void shouldTrackKeysIndependently() {
         KeyedRateLimiter limiter = new KeyedRateLimiter(1);
 

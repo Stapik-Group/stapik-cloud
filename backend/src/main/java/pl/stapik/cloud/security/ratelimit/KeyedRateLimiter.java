@@ -26,11 +26,12 @@ public class KeyedRateLimiter {
 
     public RateLimitDecision consume(String key) {
         ConsumptionProbe probe = buckets.get(key, ignored -> newBucket()).tryConsumeAndReturnRemaining(1);
+        Duration resetAfter = Duration.ofNanos(probe.getNanosToWaitForReset());
         if (probe.isConsumed()) {
-            return RateLimitDecision.permitted();
+            return RateLimitDecision.permitted(requestsPerMinute, probe.getRemainingTokens(), resetAfter);
         }
-        long secondsToWait = Duration.ofNanos(probe.getNanosToWaitForRefill()).plusSeconds(1).toSeconds();
-        return RateLimitDecision.rejected(Duration.ofSeconds(secondsToWait));
+        Duration retryAfter = Duration.ofNanos(probe.getNanosToWaitForRefill());
+        return RateLimitDecision.rejected(requestsPerMinute, retryAfter, resetAfter);
     }
 
     private Bucket newBucket() {

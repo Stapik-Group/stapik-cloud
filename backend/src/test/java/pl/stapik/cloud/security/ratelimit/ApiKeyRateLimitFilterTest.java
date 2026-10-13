@@ -53,6 +53,23 @@ class ApiKeyRateLimitFilterTest {
     }
 
     @Test
+    void shouldAnnounceRateLimitStateOnAllowedAndRejectedResponses() throws Exception {
+        ApiKeyRateLimitFilter filter = new ApiKeyRateLimitFilter(new KeyedRateLimiter(1), exceptionResolver);
+        authenticateWithApiKey(UUID.randomUUID());
+        MockHttpServletResponse allowed = new MockHttpServletResponse();
+        MockHttpServletResponse rejected = new MockHttpServletResponse();
+
+        filter.doFilter(new MockHttpServletRequest(), allowed, filterChain);
+        filter.doFilter(new MockHttpServletRequest(), rejected, filterChain);
+
+        assertThat(allowed.getHeader("X-RateLimit-Limit")).isEqualTo("1");
+        assertThat(allowed.getHeader("X-RateLimit-Remaining")).isEqualTo("0");
+        assertThat(rejected.getHeader("X-RateLimit-Limit")).isEqualTo("1");
+        assertThat(rejected.getHeader("X-RateLimit-Remaining")).isEqualTo("0");
+        assertThat(Long.parseLong(rejected.getHeader("X-RateLimit-Reset"))).isPositive();
+    }
+
+    @Test
     void shouldLimitEachApiKeySeparately() throws Exception {
         ApiKeyRateLimitFilter filter = new ApiKeyRateLimitFilter(new KeyedRateLimiter(1), exceptionResolver);
 

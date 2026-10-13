@@ -8,6 +8,13 @@ info:
     assigned 1:1 to a single Extension and a single device. Responses to requests made with a key that
     expires soon carry the X-Api-Key-Expires-At header (ISO-8601 instant).
 
+
+    Every authenticated response carries the rate limit state of the key (per minute):
+    X-RateLimit-Limit (allowed requests), X-RateLimit-Remaining (requests left) and
+    X-RateLimit-Reset (seconds until the full allowance is restored). Over the limit the
+    API answers 429 with a Retry-After header (seconds) and a problem body whose
+    retryAfterSeconds field repeats it; requests rejected that way are not processed.
+
 servers:
   - url: /api/v1
 

@@ -40,11 +40,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(TooManyRequestsException.class)
     public ResponseEntity<ProblemDetail> handleTooManyRequests(TooManyRequestsException ex) {
-        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage());
+        long retryAfterSeconds = ex.getRetryAfterSeconds();
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(
+                HttpStatus.TOO_MANY_REQUESTS, "%s. Retry after %d seconds.".formatted(ex.getMessage(), retryAfterSeconds));
         problemDetail.setTitle("Too many requests");
         problemDetail.setType(URI.create("urn:error:rate-limit:too-many-requests"));
+        problemDetail.setProperty("retryAfterSeconds", retryAfterSeconds);
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                .header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.getRetryAfter().toSeconds()))
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(retryAfterSeconds))
                 .body(problemDetail);
     }
 

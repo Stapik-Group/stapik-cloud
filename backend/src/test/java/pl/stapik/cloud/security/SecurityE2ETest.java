@@ -265,7 +265,8 @@ class SecurityE2ETest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(loginPayload("lockout-admin", "correct-password")))
                 .andExpect(status().isTooManyRequests())
-                .andExpect(header().exists("Retry-After"));
+                .andExpect(header().exists("Retry-After"))
+                .andExpect(jsonPath("$.retryAfterSeconds").isNumber());
     }
 
     @Test

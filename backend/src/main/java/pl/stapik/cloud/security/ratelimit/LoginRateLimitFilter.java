@@ -31,12 +31,14 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         RateLimitDecision decision = ipRateLimiter.consume(request.getRemoteAddr());
+        RateLimitHeaders.write(response, decision);
         if (decision.allowed()) {
             filterChain.doFilter(request, response);
             return;
         }
 
         exceptionResolver.resolveException(request, response, null,
-                new TooManyRequestsException("Too many login requests", decision.retryAfter()));
+                new TooManyRequestsException(
+                        "Too many login requests from this address (limit: %d per minute)".formatted(decision.limit()), decision.retryAfter()));
     }
 }

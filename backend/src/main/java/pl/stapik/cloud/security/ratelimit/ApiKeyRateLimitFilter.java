@@ -31,12 +31,14 @@ public class ApiKeyRateLimitFilter extends OncePerRequestFilter {
         }
 
         RateLimitDecision decision = apiKeyRateLimiter.consume(principal.apiKeyId().toString());
+        RateLimitHeaders.write(response, decision);
         if (decision.allowed()) {
             filterChain.doFilter(request, response);
             return;
         }
 
         exceptionResolver.resolveException(request, response, null,
-                new TooManyRequestsException("API key rate limit exceeded", decision.retryAfter()));
+                new TooManyRequestsException(
+                        "API key rate limit of %d requests per minute exceeded".formatted(decision.limit()), decision.retryAfter()));
     }
 }

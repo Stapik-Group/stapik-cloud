@@ -13,4 +13,8 @@ public class TooManyRequestsException extends RuntimeException {
         super(message);
         this.retryAfter = retryAfter;
     }
+
+    public long getRetryAfterSeconds() {
+        return Math.max(1, RateLimitDecision.wholeSeconds(retryAfter));
+    }
 }
