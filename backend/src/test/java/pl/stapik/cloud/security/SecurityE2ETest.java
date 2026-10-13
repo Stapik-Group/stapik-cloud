@@ -71,7 +71,7 @@ class SecurityE2ETest extends AbstractIntegrationTest {
 
     @Test
     void responsesCarrySecurityHeaders() throws Exception {
-        mockMvc.perform(get("/api/v1/health").secure(true))
+        mockMvc.perform(get("/actuator/health").secure(true))
                 .andExpect(header().string("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'"))
                 .andExpect(header().string("X-Content-Type-Options", "nosniff"))
                 .andExpect(header().string("Referrer-Policy", "no-referrer"))
@@ -212,13 +212,6 @@ class SecurityE2ETest extends AbstractIntegrationTest {
 
         assertThat(firstUse).isNotNull();
         assertThat(queryApiKeyColumn("last_used_at")).isEqualTo(firstUse);
-    }
-
-    @Test
-    void healthIsPubliclyAccessibleWithoutApiKey() throws Exception {
-        mockMvc.perform(get("/api/v1/health"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("UP"));
     }
 
     @Test

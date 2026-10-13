@@ -59,16 +59,6 @@ class SystemDelegateTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void shouldReturnHealthStatusUp() throws Exception {
-        // when & then
-        mockMvc.perform(get("/api/v1/health")
-                        .accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("UP"))
-                .andExpect(jsonPath("$.timestamp").isNotEmpty());
-    }
-
-    @Test
     void shouldReturnMeInformationForAuthenticatedUser() throws Exception {
         // given
         UUID apiKeyId = UUID.randomUUID();

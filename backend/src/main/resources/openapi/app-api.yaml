@@ -600,20 +600,6 @@ paths:
             application/json:
               schema:
                 $ref: 'common/error.yaml#/components/schemas/Problem'
-  /health:
-    get:
-      operationId: getHealth
-      tags: [system]
-      summary: Health check (no authentication required)
-      security: []
-      responses:
-        '200':
-          description: Service is up
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HealthResponse'
-
   /me:
     get:
       operationId: getMe
@@ -890,17 +876,6 @@ components:
           type: string
           enum: [READ_ONLY, READ_WRITE]
         lastUsedAt:
-          type: string
-          format: date-time
-
-    HealthResponse:
-      type: object
-      required: [status]
-      properties:
-        status:
-          type: string
-          example: UP
-        timestamp:
           type: string
           format: date-time
 

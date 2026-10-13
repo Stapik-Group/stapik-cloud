@@ -44,6 +44,12 @@ services:
     volumes:
       - asset-storage:/data/assets
       - /opt/stapik-cloud/logs:/app/logs
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/actuator/health/liveness > /dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
     ports:
       - "127.0.0.1:8080:8080"
 

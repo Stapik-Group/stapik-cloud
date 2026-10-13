@@ -33,6 +33,23 @@ spring:
       max-file-size: ${ASSET_MAX_FILE_SIZE:512MB}
       max-request-size: ${ASSET_MAX_REQUEST_SIZE:512MB}
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db,diskSpace
+  health:
+    diskspace:
+      path: ${stapik-cloud.asset-storage.root-path}
+      threshold: ${ASSET_STORAGE_MIN_FREE_SPACE:512MB}
+
 springdoc:
   swagger-ui:
     enabled: true

@@ -85,7 +85,6 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .headers(headers -> applySecurityHeaders(headers, API_CONTENT_SECURITY_POLICY))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/v1/health").permitAll()
                         .requestMatchers(HttpMethod.GET, apiBaseAllPattern).authenticated()
                         .requestMatchers(HttpMethod.HEAD, apiBaseAllPattern).authenticated()
                         .requestMatchers(HttpMethod.OPTIONS, apiBaseAllPattern).authenticated()
@@ -134,6 +133,20 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .headers(headers -> applySecurityHeaders(headers, DOCS_CONTENT_SECURITY_POLICY))
                 .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+        return http.build();
+    }
+
+    @Bean
+    @Order(4)
+    public SecurityFilterChain actuatorFilterChain(HttpSecurity http) {
+        http
+                .securityMatcher("/actuator/**")
+                .csrf(AbstractHttpConfigurer::disable)
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .headers(headers -> applySecurityHeaders(headers, API_CONTENT_SECURITY_POLICY))
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                        .anyRequest().denyAll());
         return http.build();
     }
 

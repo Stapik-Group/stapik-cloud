@@ -218,7 +218,7 @@ wait_for_healthy() {
   local deadline=$((SECONDS + HEALTH_TIMEOUT))
   while [ "${SECONDS}" -lt "${deadline}" ]; do
     if pct exec "${CTID}" -- bash -c \
-      'curl -fsS -o /dev/null http://127.0.0.1:8080/api/v1/health && curl -fsS -o /dev/null http://127.0.0.1:3000/login' \
+      'curl -fsS -o /dev/null http://127.0.0.1:8080/actuator/health/readiness && curl -fsS -o /dev/null http://127.0.0.1:3000/login' \
       > /dev/null 2>&1; then
       log "Backend and admin panel are healthy."
       return 0
