@@ -126,10 +126,14 @@ jobs:
           cp deploy/docker-compose.yml deploy/.env.example deploy/proxmox/deploy.sh dist/
           (cd dist && sha256sum * > SHA256SUMS)
 
-      - name: Create GitHub release
+      - name: Attach assets to GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          prerelease=()
-          [[ "${TAG}" == *-* ]] && prerelease=(--prerelease)
-          gh release create "${TAG}" dist/* --title "${TAG}" --generate-notes --verify-tag "${prerelease[@]}"
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release upload "${TAG}" dist/* --clobber
+          else
+            prerelease=()
+            [[ "${TAG}" == *-* ]] && prerelease=(--prerelease)
+            gh release create "${TAG}" dist/* --title "${TAG}" --generate-notes --verify-tag "${prerelease[@]}"
+          fi
