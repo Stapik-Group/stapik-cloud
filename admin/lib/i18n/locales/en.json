@@ -158,5 +158,22 @@
   "account.changePassword": "Change password",
   "account.passwordMismatch": "The passwords do not match.",
   "account.passwordChanged": "Password changed.",
-  "account.passwordChangeError": "Failed to change the password. Check the current password."
+  "account.passwordChangeError": "Failed to change the password. Check the current password.",
+  "adminUsers.you": "you",
+  "adminUsers.edit": "Edit",
+  "adminUsers.save": "Save",
+  "adminUsers.editError": "Failed to update the account.",
+  "adminUsers.delete": "Delete",
+  "adminUsers.deleteConfirm": "Delete the account {username}? It will be signed out on all devices.",
+  "adminUsers.resetPassword": "Reset password",
+  "adminUsers.resetPasswordConfirm": "Reset the password of {username}? The account will be signed out on all devices.",
+  "adminUsers.resetPasswordError": "Failed to reset the password.",
+  "adminUsers.temporaryPasswordWarning": "Temporary password for {username}. It is shown only now — pass it on securely; the user should change it after signing in.",
+  "adminUsers.newUser": "New administrator",
+  "adminUsers.username": "Username",
+  "adminUsers.password": "Password",
+  "adminUsers.role": "Role",
+  "adminUsers.create": "Create account",
+  "adminUsers.createError": "Failed to create the account.",
+  "adminUsers.usernameTaken": "This username is already taken."
 }

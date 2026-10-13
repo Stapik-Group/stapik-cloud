@@ -15,6 +15,8 @@ import java.util.UUID;
 public interface AdminUserRepository extends JpaRepository<AdminUserData, UUID> {
     Optional<AdminUserData> findByUsername(String username);
 
+    boolean existsByUsernameIgnoreCase(String username);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT adminUser FROM AdminUserData adminUser WHERE adminUser.id = :id")
     Optional<AdminUserData> findForUpdateById(@Param("id") UUID id);

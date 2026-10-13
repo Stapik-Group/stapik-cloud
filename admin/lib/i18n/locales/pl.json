@@ -158,5 +158,22 @@
   "account.changePassword": "Zmień hasło",
   "account.passwordMismatch": "Hasła nie są takie same.",
   "account.passwordChanged": "Hasło zostało zmienione.",
-  "account.passwordChangeError": "Nie udało się zmienić hasła. Sprawdź obecne hasło."
+  "account.passwordChangeError": "Nie udało się zmienić hasła. Sprawdź obecne hasło.",
+  "adminUsers.you": "Ty",
+  "adminUsers.edit": "Edytuj",
+  "adminUsers.save": "Zapisz",
+  "adminUsers.editError": "Nie udało się zaktualizować konta.",
+  "adminUsers.delete": "Usuń",
+  "adminUsers.deleteConfirm": "Usunąć konto {username}? Zostanie wylogowane na wszystkich urządzeniach.",
+  "adminUsers.resetPassword": "Resetuj hasło",
+  "adminUsers.resetPasswordConfirm": "Zresetować hasło konta {username}? Konto zostanie wylogowane na wszystkich urządzeniach.",
+  "adminUsers.resetPasswordError": "Nie udało się zresetować hasła.",
+  "adminUsers.temporaryPasswordWarning": "Hasło tymczasowe dla {username}. Widoczne tylko teraz — przekaż je bezpiecznie; po zalogowaniu użytkownik powinien je zmienić.",
+  "adminUsers.newUser": "Nowy administrator",
+  "adminUsers.username": "Nazwa użytkownika",
+  "adminUsers.password": "Hasło",
+  "adminUsers.role": "Rola",
+  "adminUsers.create": "Utwórz konto",
+  "adminUsers.createError": "Nie udało się utworzyć konta.",
+  "adminUsers.usernameTaken": "Ta nazwa użytkownika jest już zajęta."
 }

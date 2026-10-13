@@ -158,5 +158,22 @@
   "account.changePassword": "Passwort ändern",
   "account.passwordMismatch": "Die Passwörter stimmen nicht überein.",
   "account.passwordChanged": "Passwort geändert.",
-  "account.passwordChangeError": "Das Passwort konnte nicht geändert werden. Prüfen Sie das aktuelle Passwort."
+  "account.passwordChangeError": "Das Passwort konnte nicht geändert werden. Prüfen Sie das aktuelle Passwort.",
+  "adminUsers.you": "Sie",
+  "adminUsers.edit": "Bearbeiten",
+  "adminUsers.save": "Speichern",
+  "adminUsers.editError": "Das Konto konnte nicht aktualisiert werden.",
+  "adminUsers.delete": "Löschen",
+  "adminUsers.deleteConfirm": "Konto {username} löschen? Es wird auf allen Geräten abgemeldet.",
+  "adminUsers.resetPassword": "Passwort zurücksetzen",
+  "adminUsers.resetPasswordConfirm": "Passwort von {username} zurücksetzen? Das Konto wird auf allen Geräten abgemeldet.",
+  "adminUsers.resetPasswordError": "Das Passwort konnte nicht zurückgesetzt werden.",
+  "adminUsers.temporaryPasswordWarning": "Temporäres Passwort für {username}. Es wird nur jetzt angezeigt — sicher weitergeben; die Person sollte es nach der Anmeldung ändern.",
+  "adminUsers.newUser": "Neuer Administrator",
+  "adminUsers.username": "Benutzername",
+  "adminUsers.password": "Passwort",
+  "adminUsers.role": "Rolle",
+  "adminUsers.create": "Konto erstellen",
+  "adminUsers.createError": "Das Konto konnte nicht erstellt werden.",
+  "adminUsers.usernameTaken": "Dieser Benutzername ist bereits vergeben."
 }

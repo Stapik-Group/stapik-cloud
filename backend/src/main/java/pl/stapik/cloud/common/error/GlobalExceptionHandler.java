@@ -10,6 +10,7 @@ import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
+import pl.stapik.cloud.admin.AdminUserStateException;
 import pl.stapik.cloud.admin.PasswordVerificationException;
 import pl.stapik.cloud.admin.TwoFactorStateException;
 import pl.stapik.cloud.admin.TwoFactorVerificationException;
@@ -69,6 +70,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
         problem.setTitle("Verification failed");
         problem.setType(URI.create("urn:error:auth:two-factor-verification"));
+        return problem;
+    }
+
+    @ExceptionHandler(AdminUserStateException.class)
+    public ProblemDetail handleAdminUserState(AdminUserStateException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        problem.setTitle("Admin user state conflict");
+        problem.setType(URI.create("urn:error:admin-user:state"));
         return problem;
     }
 

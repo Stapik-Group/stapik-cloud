@@ -335,6 +335,104 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AdminUserListResponse'
+    post:
+      operationId: createAdminUser
+      tags: [admin-users]
+      summary: Owner-only - create an admin account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAdminUserRequest'
+      responses:
+        '201':
+          description: Admin account created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserResponse'
+        '409':
+          description: Username already taken
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+
+  /admin-users/{adminUserId}:
+    put:
+      operationId: updateAdminUser
+      tags: [admin-users]
+      summary: Owner-only - rename an account or change its role (signs the account out when the role changes)
+      parameters:
+        - $ref: '#/components/parameters/AdminUserIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAdminUserRequest'
+      responses:
+        '200':
+          description: Admin account updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserResponse'
+        '404':
+          description: Admin account not found
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+        '409':
+          description: Username already taken or an owner tried to change their own role
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+    delete:
+      operationId: deleteAdminUser
+      tags: [admin-users]
+      summary: Owner-only - delete an admin account together with its sessions
+      parameters:
+        - $ref: '#/components/parameters/AdminUserIdParam'
+      responses:
+        '204':
+          description: Admin account deleted
+        '404':
+          description: Admin account not found
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+        '409':
+          description: An owner tried to delete their own account
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+
+  /admin-users/{adminUserId}/password/reset:
+    post:
+      operationId: resetAdminUserPassword
+      tags: [admin-users]
+      summary: Owner-only - replace the password with a generated temporary one and revoke the account's sessions
+      parameters:
+        - $ref: '#/components/parameters/AdminUserIdParam'
+      responses:
+        '200':
+          description: Temporary password, shown only in this response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PasswordResetResponse'
+        '404':
+          description: Admin account not found
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
 
   /admin-users/{adminUserId}/two-factor/reset:
     post:
@@ -930,6 +1028,44 @@ components:
           type: string
         twoFactorEnabled:
           type: boolean
+
+    AdminRole:
+      type: string
+      enum: [OWNER, VIEWER]
+
+    CreateAdminUserRequest:
+      type: object
+      required: [username, password, role]
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 100
+        password:
+          type: string
+          minLength: 12
+          maxLength: 128
+        role:
+          $ref: '#/components/schemas/AdminRole'
+
+    UpdateAdminUserRequest:
+      type: object
+      required: [username, role]
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 100
+        role:
+          $ref: '#/components/schemas/AdminRole'
+
+    PasswordResetResponse:
+      type: object
+      required: [temporaryPassword]
+      properties:
+        temporaryPassword:
+          type: string
+          description: Plaintext temporary password - shown exactly once, right here.
 
     AdminUserListResponse:
       type: object

@@ -3,7 +3,8 @@ import { adminApiFetch } from "@/lib/api-client";
 import type { components } from "@/lib/api-types";
 import { getLocale } from "@/lib/i18n/locale-cookie";
 import { translate } from "@/lib/i18n/translations";
-import { ResetTwoFactorButton } from "@/components/ResetTwoFactorButton";
+import { AdminUserRow } from "@/components/AdminUserRow";
+import { CreateAdminUserForm } from "@/components/CreateAdminUserForm";
 
 type AccountResponse = components["schemas"]["AccountResponse"];
 type AdminUserListResponse = components["schemas"]["AdminUserListResponse"];
@@ -32,7 +33,7 @@ export default async function AdminUsersPage() {
 
     const { items }: AdminUserListResponse = await usersResponse.json();
     const account: AccountResponse = await accountResponse.json();
-    const canReset = account.role === "OWNER";
+    const canManage = account.role === "OWNER";
 
     return (
         <main className="p-8 space-y-6 max-w-4xl">
@@ -40,22 +41,16 @@ export default async function AdminUsersPage() {
 
             <div className="panel divide-y divide-border">
                 {items.map((adminUser) => (
-                    <div key={adminUser.id} className="py-3 first:pt-0 last:pb-0 flex items-center justify-between">
-                        <div>
-                            <span className="font-medium text-sm">{adminUser.username}</span>
-                            <span className="text-xs text-text-muted ml-2">{adminUser.role}</span>
-                        </div>
-                        <div className="flex items-center gap-4">
-                            <span className="text-sm text-text-muted">
-                                {adminUser.twoFactorEnabled ? t("adminUsers.twoFactorOn") : t("adminUsers.twoFactorOff")}
-                            </span>
-                            {canReset && adminUser.twoFactorEnabled && (
-                                <ResetTwoFactorButton adminUserId={adminUser.id} username={adminUser.username} />
-                            )}
-                        </div>
-                    </div>
+                    <AdminUserRow
+                        key={adminUser.id}
+                        adminUser={adminUser}
+                        isSelf={adminUser.username === account.username}
+                        canManage={canManage}
+                    />
                 ))}
             </div>
+
+            {canManage && <CreateAdminUserForm />}
         </main>
     );
 }
