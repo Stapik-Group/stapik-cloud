@@ -11,6 +11,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import pl.stapik.cloud.AbstractIntegrationTest;
+import pl.stapik.cloud.common.crypto.ApiKeyHasher;
 import pl.stapik.cloud.common.crypto.HashingService;
 import pl.stapik.cloud.security.admin.JwtService;
 
@@ -24,8 +25,13 @@ import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -40,6 +46,9 @@ class SecurityE2ETest extends AbstractIntegrationTest {
 
     @Autowired
     private HashingService hashingService;
+
+    @Autowired
+    private ApiKeyHasher apiKeyHasher;
 
     @Autowired
     private JwtService jwtService;
@@ -58,6 +67,15 @@ class SecurityE2ETest extends AbstractIntegrationTest {
             connection.createStatement().execute("DELETE FROM extension");
             insertExtension(connection, extensionId);
         }
+    }
+
+    @Test
+    void responsesCarrySecurityHeaders() throws Exception {
+        mockMvc.perform(get("/actuator/health").secure(true))
+                .andExpect(header().string("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'"))
+                .andExpect(header().string("X-Content-Type-Options", "nosniff"))
+                .andExpect(header().string("Referrer-Policy", "no-referrer"))
+                .andExpect(header().doesNotExist("Strict-Transport-Security"));
     }
 
     @Test
@@ -113,10 +131,87 @@ class SecurityE2ETest extends AbstractIntegrationTest {
     }
 
     @Test
-    void healthIsPubliclyAccessibleWithoutApiKey() throws Exception {
-        mockMvc.perform(get("/api/v1/health"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("UP"));
+    void readOnlyApiKeyCanReadButCannotWrite() throws Exception {
+        String rawKey = insertApiKey(extensionId, "read-only-key", "READ_ONLY", null, false);
+
+        mockMvc.perform(get("/api/v1/me").header("x-api-key", rawKey))
+                .andExpect(status().isOk());
+        mockMvc.perform(put("/api/v1/documents/settings").header("x-api-key", rawKey)
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(delete("/api/v1/documents/settings").header("x-api-key", rawKey))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/v1/documents/settings/versions/" + UUID.randomUUID() + "/restore")
+                        .header("x-api-key", rawKey))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void readWriteApiKeyPassesWriteAuthorization() throws Exception {
+        String rawKey = insertApiKey(extensionId, "read-write-key", "READ_WRITE", null, false);
+
+        mockMvc.perform(delete("/api/v1/documents/settings").header("x-api-key", rawKey))
+                .andExpect(result -> assertNotEquals(403, result.getResponse().getStatus()));
+    }
+
+    @Test
+    void viewerAdminCanReadButCannotWrite() throws Exception {
+        String viewerToken = jwtService.generateToken(UUID.randomUUID(), "viewer", "VIEWER");
+
+        mockMvc.perform(get("/api/admin/extensions").header("Authorization", "Bearer " + viewerToken))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/admin/extensions/" + extensionId + "/keys")
+                        .header("Authorization", "Bearer " + viewerToken)
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(delete("/api/admin/extensions/" + extensionId)
+                        .header("Authorization", "Bearer " + viewerToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void ownerAdminPassesWriteAuthorization() throws Exception {
+        String ownerToken = jwtService.generateToken(UUID.randomUUID(), "owner", "OWNER");
+
+        mockMvc.perform(delete("/api/admin/extensions/" + UUID.randomUUID())
+                        .header("Authorization", "Bearer " + ownerToken))
+                .andExpect(result -> assertNotEquals(403, result.getResponse().getStatus()));
+    }
+
+    @Test
+    void apiKeyOfDisabledExtensionIsRejected() throws Exception {
+        String rawKey = insertApiKey(extensionId, "desktop-key", "READ_WRITE", null, false);
+        try (Connection connection = dataSource.getConnection()) {
+            connection.createStatement().execute("UPDATE extension SET enabled = FALSE");
+        }
+
+        mockMvc.perform(get("/api/v1/me").header("x-api-key", rawKey))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void legacyBcryptApiKeyAuthenticatesAndIsUpgradedToSha256() throws Exception {
+        String rawKey = "legacy_" + UUID.randomUUID();
+        insertApiKeyRow(rawKey, hashingService.hash(rawKey), extensionId, "legacy-key", "READ_WRITE", null, false);
+
+        mockMvc.perform(get("/api/v1/me").header("x-api-key", rawKey))
+                .andExpect(status().isOk());
+
+        assertThat(queryApiKeyColumn("hashed_key")).isEqualTo(apiKeyHasher.hash(rawKey));
+        mockMvc.perform(get("/api/v1/me").header("x-api-key", rawKey))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void lastUsedAtIsUpdatedAtMostOncePerMinute() throws Exception {
+        String rawKey = insertApiKey(extensionId, "desktop-key", "READ_WRITE", null, false);
+
+        mockMvc.perform(get("/api/v1/me").header("x-api-key", rawKey)).andExpect(status().isOk());
+        String firstUse = queryApiKeyColumn("last_used_at");
+        mockMvc.perform(get("/api/v1/me").header("x-api-key", rawKey)).andExpect(status().isOk());
+
+        assertThat(firstUse).isNotNull();
+        assertThat(queryApiKeyColumn("last_used_at")).isEqualTo(firstUse);
     }
 
     @Test
@@ -134,8 +229,8 @@ class SecurityE2ETest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.token").isNotEmpty())
-                .andExpect(jsonPath("$.expiresAt").isNotEmpty());
+                .andExpect(jsonPath("$.session.token").isNotEmpty())
+                .andExpect(jsonPath("$.session.expiresAt").isNotEmpty());
     }
 
     @Test
@@ -153,6 +248,43 @@ class SecurityE2ETest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void loginIsLockedAfterRepeatedFailuresEvenWithCorrectPassword() throws Exception {
+        insertAdminUser("lockout-admin");
+
+        for (int attempt = 0; attempt < 5; attempt++) {
+            mockMvc.perform(post("/api/admin/auth/login")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(loginPayload("lockout-admin", "wrong-password")))
+                    .andExpect(status().isUnauthorized());
+        }
+
+        mockMvc.perform(post("/api/admin/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(loginPayload("lockout-admin", "correct-password")))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().exists("Retry-After"))
+                .andExpect(jsonPath("$.retryAfterSeconds").isNumber());
+    }
+
+    @Test
+    void successfulLoginResetsFailedAttempts() throws Exception {
+        insertAdminUser("reset-admin");
+
+        for (int round = 0; round < 3; round++) {
+            for (int attempt = 0; attempt < 4; attempt++) {
+                mockMvc.perform(post("/api/admin/auth/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(loginPayload("reset-admin", "wrong-password")))
+                        .andExpect(status().isUnauthorized());
+            }
+            mockMvc.perform(post("/api/admin/auth/login")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(loginPayload("reset-admin", "correct-password")))
+                    .andExpect(status().isOk());
+        }
     }
 
     @Test
@@ -196,11 +328,28 @@ class SecurityE2ETest extends AbstractIntegrationTest {
                 .getResponse()
                 .getContentAsString();
 
-        String token = JsonPath.read(loginResponse, "$.token");
+        String token = JsonPath.read(loginResponse, "$.session.token");
 
         mockMvc.perform(get("/api/admin/extensions")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk());
+    }
+
+    private String queryApiKeyColumn(String column) throws Exception {
+        try (Connection connection = dataSource.getConnection();
+             var resultSet = connection.createStatement().executeQuery("SELECT " + column + " FROM api_key")) {
+            resultSet.next();
+            return resultSet.getString(1);
+        }
+    }
+
+    private String loginPayload(String username, String password) {
+        return """
+                {
+                    "username": "%s",
+                    "password": "%s"
+                }
+                """.formatted(username, password);
     }
 
     private void insertExtension(Connection connection, UUID id) throws Exception {
@@ -217,8 +366,12 @@ class SecurityE2ETest extends AbstractIntegrationTest {
 
     private String insertApiKey(UUID extId, String label, String scope, Instant expiresAt, boolean revoked) throws Exception {
         String rawKey = "prefix_" + UUID.randomUUID();
+        insertApiKeyRow(rawKey, apiKeyHasher.hash(rawKey), extId, label, scope, expiresAt, revoked);
+        return rawKey;
+    }
+
+    private void insertApiKeyRow(String rawKey, String hashedKey, UUID extId, String label, String scope, Instant expiresAt, boolean revoked) throws Exception {
         String prefix = rawKey.substring(0, 8);
-        String hashedKey = hashingService.hash(rawKey);
 
         try (Connection connection = dataSource.getConnection()) {
             String sql = "INSERT INTO api_key (id, extension_id, label, key_prefix, hashed_key, scope, expires_at, revoked, created_at) " +
@@ -240,8 +393,6 @@ class SecurityE2ETest extends AbstractIntegrationTest {
                 ps.executeUpdate();
             }
         }
-
-        return rawKey;
     }
 
     private void insertAdminUser(String username) throws Exception {

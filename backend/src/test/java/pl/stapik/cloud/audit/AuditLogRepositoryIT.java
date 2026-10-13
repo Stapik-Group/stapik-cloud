@@ -1,5 +1,6 @@
 package pl.stapik.cloud.audit;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -23,6 +24,11 @@ class AuditLogRepositoryIT extends AbstractIntegrationTest {
 
     @Autowired
     private ExtensionRepository extensionRepository;
+
+    @BeforeEach
+    void clearAuditLog() {
+        auditLogRepository.deleteAll();
+    }
 
     @Test
     void shouldFindByExtensionIdOrderByOccurredAtDesc() {
@@ -109,6 +115,23 @@ class AuditLogRepositoryIT extends AbstractIntegrationTest {
 
         // then
         assertThat(result.getContent()).isEmpty();
+    }
+
+    @Test
+    void shouldDeleteOnlyEntriesOlderThanCutoff() {
+        // given
+        Instant cutoff = Instant.now().minusSeconds(3600);
+        createEntry(null, "ACTION_OLD", cutoff.minusSeconds(60));
+        createEntry(null, "ACTION_NEW", cutoff.plusSeconds(60));
+
+        // when
+        int deleted = auditLogRepository.deleteOlderThan(cutoff);
+
+        // then
+        assertThat(deleted).isEqualTo(1);
+        assertThat(auditLogRepository.findAllByOrderByOccurredAtDesc(PageRequest.of(0, 10)).getContent())
+                .extracting(AuditLogEntryData::getAction)
+                .containsExactly("ACTION_NEW");
     }
 
     private void createEntry(UUID extensionId, String action, Instant occurredAt) {

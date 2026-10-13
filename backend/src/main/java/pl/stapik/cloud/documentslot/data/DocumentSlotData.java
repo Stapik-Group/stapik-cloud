@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -34,6 +35,11 @@ public class DocumentSlotData {
     @Column(name = "max_size_bytes", nullable = false)
     private long maxSizeBytes;
 
+    @Convert(converter = MimeTypeListConverter.class)
+    @Column(name = "allowed_mime_types")
+    @Builder.Default
+    private List<String> allowedMimeTypes = List.of();
+
     @Column(name = "versioning_enabled", nullable = false)
     private boolean versioningEnabled;
 
@@ -46,4 +52,14 @@ public class DocumentSlotData {
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
+
+    public boolean allowsMimeType(String mimeType) {
+        return allowedMimeTypes.isEmpty() || allowedMimeTypes.stream().anyMatch(allowed -> matches(allowed, mimeType));
+    }
+
+    private static boolean matches(String allowed, String mimeType) {
+        return allowed.endsWith("/*")
+                ? mimeType.startsWith(allowed.substring(0, allowed.length() - 1))
+                : allowed.equals(mimeType);
+    }
 }

@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Stapik Cloud - Admin API
-  version: 1.0.2
+  version: 1.1.1
   description: >
     Admin panel API (React) - login, extension wizard, slot/key management, document
     browser, audit log. Authentication: JWT (Bearer), fully separated from client
@@ -15,18 +15,24 @@ security:
 
 tags:
   - name: auth
+  - name: account
+  - name: admin-users
   - name: extensions
   - name: slots
   - name: keys
   - name: admin-documents
+  - name: admin-assets
   - name: audit-log
+  - name: dashboard
 
 paths:
   /auth/login:
     post:
       operationId: login
       tags: [auth]
-      summary: Log in to the admin panel, returns a JWT token
+      summary: >
+        Log in to the admin panel. Returns a session, or a two-factor challenge when the
+        account has two-factor authentication enabled.
       security: []
       requestBody:
         required: true
@@ -36,11 +42,11 @@ paths:
               $ref: '#/components/schemas/LoginRequest'
       responses:
         '200':
-          description: Logged in
+          description: Logged in, or a two-factor challenge was issued
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LoginResponse'
+                $ref: '#/components/schemas/LoginResult'
         '401':
           description: Wrong credentials
           content:
@@ -49,6 +55,38 @@ paths:
                 $ref: 'common/error.yaml#/components/schemas/Problem'
         '400':
           description: Missing credentials
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+
+  /auth/login/two-factor:
+    post:
+      operationId: completeTwoFactorLogin
+      tags: [auth]
+      summary: Finish a login with a TOTP code or a backup code
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TwoFactorLoginRequest'
+      responses:
+        '200':
+          description: Session issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Challenge expired or invalid, or the code is wrong
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+        '400':
+          description: Missing challenge or code
           content:
             application/json:
               schema:
@@ -103,6 +141,313 @@ paths:
           description: Refresh token revoked
         '400':
           description: Missing refresh token
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+
+  /account:
+    get:
+      operationId: getAccount
+      tags: [account]
+      summary: Signed-in admin account and its two-factor state
+      responses:
+        '200':
+          description: Account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountResponse'
+
+  /account/two-factor/setup:
+    post:
+      operationId: beginTwoFactorSetup
+      tags: [account]
+      summary: Generate a new TOTP secret and QR code, two-factor stays off until confirmed
+      responses:
+        '200':
+          description: Secret to scan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TwoFactorSetupResponse'
+        '409':
+          description: Two-factor authentication is already enabled
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+
+  /account/two-factor/enable:
+    post:
+      operationId: enableTwoFactor
+      tags: [account]
+      summary: Confirm the setup with a TOTP code, returns one-time backup codes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TwoFactorEnableRequest'
+      responses:
+        '200':
+          description: Two-factor enabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BackupCodesResponse'
+        '400':
+          description: Wrong code
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+        '409':
+          description: Setup not started or two-factor already enabled
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+
+  /account/two-factor/disable:
+    post:
+      operationId: disableTwoFactor
+      tags: [account]
+      summary: Turn two-factor authentication off
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TwoFactorConfirmationRequest'
+      responses:
+        '204':
+          description: Two-factor disabled
+        '400':
+          description: Wrong password or code
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+        '409':
+          description: Two-factor authentication is not enabled
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+
+  /account/two-factor/backup-codes:
+    post:
+      operationId: regenerateBackupCodes
+      tags: [account]
+      summary: Replace all backup codes with a new set
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TwoFactorConfirmationRequest'
+      responses:
+        '200':
+          description: New backup codes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BackupCodesResponse'
+        '400':
+          description: Wrong password or code
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+        '409':
+          description: Two-factor authentication is not enabled
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+
+  /account/password:
+    post:
+      operationId: changePassword
+      tags: [account]
+      summary: Change the password of the signed-in admin and sign out all other sessions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+      responses:
+        '204':
+          description: Password changed
+        '400':
+          description: Wrong current password or the new password is too short
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+
+  /account/sessions:
+    get:
+      operationId: listSessions
+      tags: [account]
+      summary: Active sessions of the signed-in admin
+      responses:
+        '200':
+          description: Sessions, most recently active first
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionListResponse'
+    delete:
+      operationId: revokeOtherSessions
+      tags: [account]
+      summary: Sign out every session except the current one
+      responses:
+        '204':
+          description: Other sessions signed out
+
+  /account/sessions/{sessionId}:
+    delete:
+      operationId: revokeSession
+      tags: [account]
+      summary: Sign out a single session
+      parameters:
+        - $ref: '#/components/parameters/SessionIdParam'
+      responses:
+        '204':
+          description: Session signed out
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+
+  /admin-users:
+    get:
+      operationId: listAdminUsers
+      tags: [admin-users]
+      summary: List admin accounts with their two-factor state
+      responses:
+        '200':
+          description: Admin accounts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserListResponse'
+    post:
+      operationId: createAdminUser
+      tags: [admin-users]
+      summary: Owner-only - create an admin account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAdminUserRequest'
+      responses:
+        '201':
+          description: Admin account created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserResponse'
+        '409':
+          description: Username already taken
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+
+  /admin-users/{adminUserId}:
+    put:
+      operationId: updateAdminUser
+      tags: [admin-users]
+      summary: Owner-only - rename an account or change its role (signs the account out when the role changes)
+      parameters:
+        - $ref: '#/components/parameters/AdminUserIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAdminUserRequest'
+      responses:
+        '200':
+          description: Admin account updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserResponse'
+        '404':
+          description: Admin account not found
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+        '409':
+          description: Username already taken or an owner tried to change their own role
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+    delete:
+      operationId: deleteAdminUser
+      tags: [admin-users]
+      summary: Owner-only - delete an admin account together with its sessions
+      parameters:
+        - $ref: '#/components/parameters/AdminUserIdParam'
+      responses:
+        '204':
+          description: Admin account deleted
+        '404':
+          description: Admin account not found
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+        '409':
+          description: An owner tried to delete their own account
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+
+  /admin-users/{adminUserId}/password/reset:
+    post:
+      operationId: resetAdminUserPassword
+      tags: [admin-users]
+      summary: Owner-only - replace the password with a generated temporary one and revoke the account's sessions
+      parameters:
+        - $ref: '#/components/parameters/AdminUserIdParam'
+      responses:
+        '200':
+          description: Temporary password, shown only in this response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PasswordResetResponse'
+        '404':
+          description: Admin account not found
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+
+  /admin-users/{adminUserId}/two-factor/reset:
+    post:
+      operationId: resetAdminUserTwoFactor
+      tags: [admin-users]
+      summary: Owner-only recovery - clear two-factor state and revoke the account's sessions
+      parameters:
+        - $ref: '#/components/parameters/AdminUserIdParam'
+      responses:
+        '204':
+          description: Two-factor reset
+        '404':
+          description: Admin account not found
           content:
             application/json:
               schema:
@@ -300,9 +645,13 @@ paths:
       parameters:
         - $ref: '#/components/parameters/ExtensionIdParam'
         - $ref: '#/components/parameters/SlotKeyPathParam'
+        - $ref: '#/components/parameters/PartitionQueryParam'
       responses:
         '200':
           description: Document content
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
@@ -316,6 +665,8 @@ paths:
       parameters:
         - $ref: '#/components/parameters/ExtensionIdParam'
         - $ref: '#/components/parameters/SlotKeyPathParam'
+        - $ref: '#/components/parameters/IfMatchParam'
+        - $ref: '#/components/parameters/PartitionQueryParam'
       requestBody:
         required: true
         content:
@@ -325,6 +676,9 @@ paths:
       responses:
         '200':
           description: Document content updated
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
@@ -338,7 +692,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          description: Document was modified after the supplied clientLastKnownUpdate
+          description: If-Match is missing or does not match the current document ETag, or the document is end-to-end encrypted
 
   /extensions/{extensionId}/documents/{slotKey}/versions:
     get:
@@ -348,6 +702,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/ExtensionIdParam'
         - $ref: '#/components/parameters/SlotKeyPathParam'
+        - $ref: '#/components/parameters/PartitionQueryParam'
       responses:
         '200':
           description: List of versions
@@ -355,6 +710,39 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AdminDocumentVersionListResponse'
+
+  /extensions/{extensionId}/documents/{slotKey}/versions/diff:
+    get:
+      operationId: compareDocumentVersionsAdmin
+      tags: [admin-documents]
+      summary: Compare two versions of a document (the second defaults to the current content)
+      parameters:
+        - $ref: '#/components/parameters/ExtensionIdParam'
+        - $ref: '#/components/parameters/SlotKeyPathParam'
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: to
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/PartitionQueryParam'
+      responses:
+        '200':
+          description: Both sides with their content and the structural JSON changes between them
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminDocumentDiffResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: One of the compared versions is end-to-end encrypted
 
   /extensions/{extensionId}/documents/{slotKey}/versions/{versionId}/restore:
     post:
@@ -370,13 +758,142 @@ paths:
           schema:
             type: string
             format: uuid
+        - $ref: '#/components/parameters/PartitionQueryParam'
       responses:
         '200':
           description: Restored
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AdminDocumentResponse'
+
+  /extensions/{extensionId}/documents/{slotKey}/partitions:
+    get:
+      operationId: listDocumentPartitionsAdmin
+      tags: [admin-documents]
+      summary: List the named partitions of a document slot
+      parameters:
+        - $ref: '#/components/parameters/ExtensionIdParam'
+        - $ref: '#/components/parameters/SlotKeyPathParam'
+      responses:
+        '200':
+          description: Existing partitions, sorted by key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminDocumentPartitionListResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /extensions/{extensionId}/assets/{slotKey}:
+    get:
+      operationId: listAdminAssets
+      tags: [admin-assets]
+      summary: List the files stored in a slot
+      parameters:
+        - $ref: '#/components/parameters/ExtensionIdParam'
+        - $ref: '#/components/parameters/SlotKeyPathParam'
+      responses:
+        '200':
+          description: Files of the slot, sorted by filename
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminAssetListResponse'
+        '404':
+          description: Slot not found
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+
+  /extensions/{extensionId}/assets/{slotKey}/{filename}:
+    get:
+      operationId: downloadAdminAsset
+      tags: [admin-assets]
+      summary: Download a file, or fetch it for inline preview
+      parameters:
+        - $ref: '#/components/parameters/ExtensionIdParam'
+        - $ref: '#/components/parameters/SlotKeyPathParam'
+        - $ref: '#/components/parameters/FilenamePathParam'
+        - name: inline
+          in: query
+          description: Serve the file inline with its real content type. Honoured only for previewable types; any other file is always sent as an attachment.
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: File content (streamed)
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Slot or file not found
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+    put:
+      operationId: uploadAdminAsset
+      tags: [admin-assets]
+      summary: Upload or overwrite a file
+      parameters:
+        - $ref: '#/components/parameters/ExtensionIdParam'
+        - $ref: '#/components/parameters/SlotKeyPathParam'
+        - $ref: '#/components/parameters/FilenamePathParam'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminAssetResponse'
+        '404':
+          description: Slot not found
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+        '413':
+          description: Maximum file size of the slot exceeded
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+    delete:
+      operationId: deleteAdminAsset
+      tags: [admin-assets]
+      summary: Delete a file
+      parameters:
+        - $ref: '#/components/parameters/ExtensionIdParam'
+        - $ref: '#/components/parameters/SlotKeyPathParam'
+        - $ref: '#/components/parameters/FilenamePathParam'
+      responses:
+        '204':
+          description: Deleted
+        '404':
+          description: Slot or file not found
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
 
   /audit-log:
     get:
@@ -407,6 +924,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/AuditLogPageResponse'
 
+  /dashboard/stats:
+    get:
+      operationId: getDashboardStats
+      tags: [dashboard]
+      summary: Aggregated numbers for the admin dashboard
+      responses:
+        '200':
+          description: Dashboard statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardStatsResponse'
+
 components:
   securitySchemes:
     BearerAuth:
@@ -414,7 +944,42 @@ components:
       scheme: bearer
       bearerFormat: JWT
 
+  headers:
+    ETag:
+      description: Quoted content hash of the returned document - send it back in If-Match when editing.
+      schema:
+        type: string
+
   parameters:
+    PartitionQueryParam:
+      name: partition
+      in: query
+      required: false
+      description: Named partition of the slot. The main document when omitted.
+      schema:
+        type: string
+    IfMatchParam:
+      name: If-Match
+      in: header
+      required: false
+      description: >
+        ETag of the document version the editor loaded. A missing or stale value is a conflict.
+      schema:
+        type: string
+    AdminUserIdParam:
+      name: adminUserId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    SessionIdParam:
+      name: sessionId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
     ExtensionIdParam:
       name: extensionId
       in: path
@@ -431,6 +996,12 @@ components:
         format: uuid
     SlotKeyPathParam:
       name: slotKey
+      in: path
+      required: true
+      schema:
+        type: string
+    FilenamePathParam:
+      name: filename
       in: path
       required: true
       schema:
@@ -481,6 +1052,187 @@ components:
         refreshExpiresAt:
           type: string
           format: date-time
+
+    LoginResult:
+      type: object
+      required: [twoFactorRequired]
+      properties:
+        twoFactorRequired:
+          type: boolean
+        challengeToken:
+          type: string
+        challengeExpiresAt:
+          type: string
+          format: date-time
+        session:
+          $ref: '#/components/schemas/LoginResponse'
+
+    TwoFactorLoginRequest:
+      type: object
+      required: [challengeToken, code]
+      properties:
+        challengeToken:
+          type: string
+        code:
+          type: string
+          minLength: 1
+
+    AccountResponse:
+      type: object
+      required: [username, role, twoFactorEnabled, backupCodesRemaining]
+      properties:
+        username:
+          type: string
+        role:
+          type: string
+        twoFactorEnabled:
+          type: boolean
+        backupCodesRemaining:
+          type: integer
+          format: int64
+
+    ChangePasswordRequest:
+      type: object
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword:
+          type: string
+          minLength: 1
+        newPassword:
+          type: string
+          minLength: 12
+          maxLength: 128
+
+    SessionResponse:
+      type: object
+      required: [id, startedAt, lastActiveAt, expiresAt, current]
+      properties:
+        id:
+          type: string
+          format: uuid
+        startedAt:
+          type: string
+          format: date-time
+        lastActiveAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        ipAddress:
+          type: string
+        userAgent:
+          type: string
+        current:
+          type: boolean
+
+    SessionListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SessionResponse'
+
+    TwoFactorSetupResponse:
+      type: object
+      required: [secret, provisioningUri, qrCodeSvg]
+      properties:
+        secret:
+          type: string
+        provisioningUri:
+          type: string
+        qrCodeSvg:
+          type: string
+
+    TwoFactorEnableRequest:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          minLength: 1
+
+    TwoFactorConfirmationRequest:
+      type: object
+      required: [password, code]
+      properties:
+        password:
+          type: string
+        code:
+          type: string
+          minLength: 1
+
+    BackupCodesResponse:
+      type: object
+      required: [backupCodes]
+      properties:
+        backupCodes:
+          type: array
+          items:
+            type: string
+
+    AdminUserResponse:
+      type: object
+      required: [id, username, role, twoFactorEnabled]
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        role:
+          type: string
+        twoFactorEnabled:
+          type: boolean
+
+    AdminRole:
+      type: string
+      enum: [OWNER, VIEWER]
+
+    CreateAdminUserRequest:
+      type: object
+      required: [username, password, role]
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 100
+        password:
+          type: string
+          minLength: 12
+          maxLength: 128
+        role:
+          $ref: '#/components/schemas/AdminRole'
+
+    UpdateAdminUserRequest:
+      type: object
+      required: [username, role]
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 100
+        role:
+          $ref: '#/components/schemas/AdminRole'
+
+    PasswordResetResponse:
+      type: object
+      required: [temporaryPassword]
+      properties:
+        temporaryPassword:
+          type: string
+          description: Plaintext temporary password - shown exactly once, right here.
+
+    AdminUserListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminUserResponse'
 
     RefreshTokenRequest:
       type: object
@@ -558,6 +1310,13 @@ components:
           allOf:
             - $ref: '#/components/schemas/ConflictStrategy'
           default: LAST_WRITE_WINS_WITH_SHADOW_COPY
+        allowedMimeTypes:
+          type: array
+          description: Detected content types accepted in this slot. Entries are exact (image/png) or a type wildcard (image/*). Empty allows any.
+          items:
+            type: string
+            pattern: '^[a-z0-9][a-z0-9!#$&^_.+-]*\x2F([a-z0-9][a-z0-9!#$&^_.+-]*|\*)$'
+          default: []
 
     DocumentSlotResponse:
       allOf:
@@ -608,6 +1367,10 @@ components:
           type: string
           format: date-time
           nullable: true
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
         createdAt:
           type: string
           format: date-time
@@ -632,25 +1395,29 @@ components:
 
     AdminDocumentResponse:
       type: object
-      required: [slotKey, content, updatedAt]
+      required: [slotKey, content, contentHash, updatedAt, encrypted]
       properties:
         slotKey:
           type: string
         content:
           type: string
+        contentHash:
+          type: string
         updatedAt:
           type: string
           format: date-time
+        encrypted:
+          type: boolean
+          description: >
+            The content is an end-to-end encrypted envelope produced by the client. The server cannot read, edit or
+            compare it.
 
     AdminDocumentWriteRequest:
       type: object
-      required: [content, clientLastKnownUpdate]
+      required: [content]
       properties:
         content:
           type: string
-        clientLastKnownUpdate:
-          type: string
-          format: date-time
 
     AdminDocumentVersionListResponse:
       type: object
@@ -670,6 +1437,108 @@ components:
               reason:
                 type: string
                 enum: [NORMAL_WRITE, CONFLICT_DISCARDED, MANUAL_RESTORE]
+              deviceId:
+                type: string
+                format: uuid
+                description: Id of the API key (device) that wrote this version; absent for versions written from the admin panel.
+              deviceLabel:
+                type: string
+                description: Label of that device's API key at the time of writing.
+
+    AdminDocumentDiffResponse:
+      type: object
+      required: [from, to, changes]
+      properties:
+        from:
+          $ref: '#/components/schemas/AdminDocumentDiffSide'
+        to:
+          $ref: '#/components/schemas/AdminDocumentDiffSide'
+        changes:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminDocumentDiffChange'
+
+    AdminDocumentDiffSide:
+      type: object
+      required: [savedAt, content]
+      properties:
+        versionId:
+          type: string
+          format: uuid
+          description: Absent when this side is the current document content.
+        savedAt:
+          type: string
+          format: date-time
+        content:
+          type: string
+
+    AdminDocumentDiffChange:
+      type: object
+      required: [path, type]
+      properties:
+        path:
+          type: string
+          description: JSON Pointer (RFC 6901) to the changed value; empty for the document root.
+        type:
+          type: string
+          enum: [ADDED, REMOVED, CHANGED]
+        before:
+          type: string
+          description: JSON-encoded value in the first version; absent for ADDED.
+        after:
+          type: string
+          description: JSON-encoded value in the second version; absent for REMOVED.
+
+    AdminDocumentPartitionResponse:
+      type: object
+      required: [partition, sizeBytes, updatedAt]
+      properties:
+        partition:
+          type: string
+        sizeBytes:
+          type: integer
+          format: int64
+        updatedAt:
+          type: string
+          format: date-time
+
+    AdminDocumentPartitionListResponse:
+      type: object
+      required: [partitions]
+      properties:
+        partitions:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminDocumentPartitionResponse'
+
+    AdminAssetResponse:
+      type: object
+      required: [filename, mimeType, sizeBytes, checksumSha256, updatedAt, previewable]
+      properties:
+        filename:
+          type: string
+        mimeType:
+          type: string
+        sizeBytes:
+          type: integer
+          format: int64
+        checksumSha256:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+        previewable:
+          type: boolean
+          description: Whether the file can be displayed inline (images and PDF).
+
+    AdminAssetListResponse:
+      type: object
+      required: [assets]
+      properties:
+        assets:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminAssetResponse'
 
     AuditLogEntryResponse:
       type: object
@@ -703,6 +1572,96 @@ components:
         size:
           type: integer
         totalElements:
+          type: integer
+          format: int64
+
+    DashboardStatsResponse:
+      type: object
+      required: [documentStorageBytes, assetStorageBytes, documentCount, assetCount, apiKeyActivity, recentConflicts, writesPerDay]
+      properties:
+        documentStorageBytes:
+          type: integer
+          format: int64
+        assetStorageBytes:
+          type: integer
+          format: int64
+        documentCount:
+          type: integer
+          format: int64
+        assetCount:
+          type: integer
+          format: int64
+        apiKeyActivity:
+          type: array
+          description: Active API keys, most recently used first.
+          items:
+            $ref: '#/components/schemas/DashboardApiKeyActivity'
+        recentConflicts:
+          type: array
+          description: Most recent writes discarded by a conflict, newest first.
+          items:
+            $ref: '#/components/schemas/DashboardConflict'
+        writesPerDay:
+          type: array
+          description: Retained document writes per UTC day for the last 30 days, oldest first, days without writes included.
+          items:
+            $ref: '#/components/schemas/DashboardDailyWrites'
+
+    DashboardApiKeyActivity:
+      type: object
+      required: [id, label, keyPrefix, scope, extensionId, extensionName]
+      properties:
+        id:
+          type: string
+          format: uuid
+        label:
+          type: string
+        keyPrefix:
+          type: string
+        scope:
+          $ref: '#/components/schemas/ApiKeyScope'
+        extensionId:
+          type: string
+          format: uuid
+        extensionName:
+          type: string
+        lastUsedAt:
+          type: string
+          format: date-time
+          description: Absent when the key has never been used.
+
+    DashboardConflict:
+      type: object
+      required: [versionId, extensionId, extensionName, slotKey, savedAt]
+      properties:
+        versionId:
+          type: string
+          format: uuid
+        extensionId:
+          type: string
+          format: uuid
+        extensionName:
+          type: string
+        slotKey:
+          type: string
+        partition:
+          type: string
+          description: Absent for the main document of the slot.
+        deviceLabel:
+          type: string
+          description: Label of the API key whose write was discarded.
+        savedAt:
+          type: string
+          format: date-time
+
+    DashboardDailyWrites:
+      type: object
+      required: [date, count]
+      properties:
+        date:
+          type: string
+          format: date
+        count:
           type: integer
           format: int64
 

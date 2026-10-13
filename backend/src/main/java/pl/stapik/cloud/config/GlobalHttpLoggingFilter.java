@@ -12,6 +12,7 @@ import org.slf4j.MDC;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.util.ContentCachingResponseWrapper;
+import pl.stapik.cloud.config.logger.HttpBodyRedactor;
 import pl.stapik.cloud.config.logger.JsonLoggerBuilder;
 import pl.stapik.cloud.config.logger.TruncatedLoggerBuilder;
 import pl.stapik.cloud.util.StringUtils;
@@ -28,9 +29,11 @@ public class GlobalHttpLoggingFilter extends OncePerRequestFilter {
     private static final Logger fullLog = LoggerFactory.getLogger("HTTP_FULL");
     private static final String TRACE_ID_KEY = "traceId";
     private static final String MULTIPART_BODY_PLACEHOLDER = "MULTIPART_BODY_NOT_LOGGED";
+    private static final String BINARY_BODY_PLACEHOLDER = "BINARY_BODY_NOT_LOGGED";
 
     private final TruncatedLoggerBuilder truncatedLogger;
     private final JsonLoggerBuilder jsonLogger;
+    private final HttpBodyRedactor bodyRedactor;
 
     @Override
     protected void doFilterInternal(@NonNull HttpServletRequest request,
@@ -46,6 +49,8 @@ public class GlobalHttpLoggingFilter extends OncePerRequestFilter {
         String requestBody;
         if (isMultipart(request)) {
             requestBody = MULTIPART_BODY_PLACEHOLDER;
+        } else if (isBinary(request)) {
+            requestBody = BINARY_BODY_PLACEHOLDER;
         } else {
             CachedBodyHttpServletRequestWrapper cachedRequest = new CachedBodyHttpServletRequestWrapper(request);
             requestToPass = cachedRequest;
@@ -72,8 +77,18 @@ public class GlobalHttpLoggingFilter extends OncePerRequestFilter {
         return contentType != null && contentType.toLowerCase(Locale.ROOT).startsWith("multipart/");
     }
 
+    private static boolean isBinary(HttpServletRequest request) {
+        String contentType = request.getContentType();
+        return contentType != null && contentType.toLowerCase(Locale.ROOT).startsWith("application/octet-stream");
+    }
+
+    private String loggableBody(String uri, String rawBody) {
+        String redacted = bodyRedactor.redact(uri, rawBody);
+        return redacted.isEmpty() ? "EMPTY_BODY" : redacted;
+    }
+
     private void logRequest(HttpServletRequest request, String requestBody) {
-        String body = requestBody.isEmpty() ? "EMPTY_BODY" : requestBody;
+        String body = loggableBody(request.getRequestURI(), requestBody);
 
         // stdout - truncated
         var truncatedRequest = truncatedLogger.createRequest(request.getMethod(), request.getRequestURI(), body);
@@ -85,7 +100,7 @@ public class GlobalHttpLoggingFilter extends OncePerRequestFilter {
     }
 
     private void logResponse(HttpServletRequest request, ContentCachingResponseWrapper response, long durationMs, String responseBody) {
-        String body = responseBody.isEmpty() ? "EMPTY_BODY" : responseBody;
+        String body = loggableBody(request.getRequestURI(), responseBody);
 
         // stdout - truncated
         var truncatedResponse = truncatedLogger.createResponse(request.getMethod(), request.getRequestURI(), response.getStatus(), durationMs, body);

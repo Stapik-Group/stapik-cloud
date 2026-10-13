@@ -11,6 +11,8 @@ import pl.stapik.cloud.admin.RefreshTokenRepository;
 import pl.stapik.cloud.admin.data.AdminUserData;
 import pl.stapik.cloud.admin.data.RefreshTokenData;
 import pl.stapik.cloud.admin.dto.AdminSession;
+import pl.stapik.cloud.admin.dto.SessionInfo;
+import pl.stapik.cloud.security.admin.ClientInfo;
 import pl.stapik.cloud.security.admin.JwtService;
 
 import java.nio.charset.StandardCharsets;
@@ -18,10 +20,13 @@ import java.security.MessageDigest;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HexFormat;
+import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
@@ -34,6 +39,7 @@ class AdminSessionServiceImplTest {
 
     private static final long REFRESH_EXPIRATION_DAYS = 7;
     private static final long REUSE_LEEWAY_SECONDS = 30;
+    private static final ClientInfo CLIENT = new ClientInfo("203.0.113.7", "test-agent");
     private static final String ACCESS_TOKEN = "access-token";
     private static final Instant ACCESS_TOKEN_EXPIRES_AT = Instant.parse("2030-01-01T00:00:00Z");
 
@@ -66,7 +72,7 @@ class AdminSessionServiceImplTest {
         givenAccessTokenIsIssued();
 
         // when
-        AdminSession session = adminSessionService.startSession(adminUser);
+        AdminSession session = adminSessionService.startSession(adminUser, CLIENT);
 
         // then
         assertThat(session.accessToken()).isEqualTo(ACCESS_TOKEN);
@@ -90,8 +96,8 @@ class AdminSessionServiceImplTest {
         givenAccessTokenIsIssued();
 
         // when
-        AdminSession firstSession = adminSessionService.startSession(adminUser);
-        AdminSession secondSession = adminSessionService.startSession(adminUser);
+        AdminSession firstSession = adminSessionService.startSession(adminUser, CLIENT);
+        AdminSession secondSession = adminSessionService.startSession(adminUser, CLIENT);
 
         // then
         assertThat(firstSession.refreshToken()).isNotEqualTo(secondSession.refreshToken());
@@ -107,7 +113,7 @@ class AdminSessionServiceImplTest {
         givenAccessTokenIsIssued();
 
         // when
-        Optional<AdminSession> session = adminSessionService.refreshSession(presentedToken);
+        Optional<AdminSession> session = adminSessionService.refreshSession(presentedToken, CLIENT);
 
         // then
         assertThat(session).isPresent();
@@ -127,7 +133,7 @@ class AdminSessionServiceImplTest {
         givenAccessTokenIsIssued();
 
         // when
-        Optional<AdminSession> session = adminSessionService.refreshSession(presentedToken);
+        Optional<AdminSession> session = adminSessionService.refreshSession(presentedToken, CLIENT);
 
         // then
         assertThat(session).isPresent();
@@ -143,7 +149,7 @@ class AdminSessionServiceImplTest {
         given(refreshTokenRepository.findByTokenHash(sha256Hex(presentedToken))).willReturn(Optional.of(storedToken));
 
         // when
-        Optional<AdminSession> session = adminSessionService.refreshSession(presentedToken);
+        Optional<AdminSession> session = adminSessionService.refreshSession(presentedToken, CLIENT);
 
         // then
         assertThat(session).isEmpty();
@@ -158,7 +164,7 @@ class AdminSessionServiceImplTest {
         given(refreshTokenRepository.findByTokenHash(sha256Hex(presentedToken))).willReturn(Optional.of(storedToken));
 
         // when
-        Optional<AdminSession> session = adminSessionService.refreshSession(presentedToken);
+        Optional<AdminSession> session = adminSessionService.refreshSession(presentedToken, CLIENT);
 
         // then
         assertThat(session).isEmpty();
@@ -171,7 +177,7 @@ class AdminSessionServiceImplTest {
         given(refreshTokenRepository.findByTokenHash(sha256Hex("unknown"))).willReturn(Optional.empty());
 
         // when
-        Optional<AdminSession> session = adminSessionService.refreshSession("unknown");
+        Optional<AdminSession> session = adminSessionService.refreshSession("unknown", CLIENT);
 
         // then
         assertThat(session).isEmpty();
@@ -187,11 +193,87 @@ class AdminSessionServiceImplTest {
         given(adminUserRepository.findById(adminUser.getId())).willReturn(Optional.empty());
 
         // when
-        Optional<AdminSession> session = adminSessionService.refreshSession(presentedToken);
+        Optional<AdminSession> session = adminSessionService.refreshSession(presentedToken, CLIENT);
 
         // then
         assertThat(session).isEmpty();
         verify(refreshTokenRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldKeepSessionIdentityAcrossRefresh() {
+        // given
+        String presentedToken = "presented-refresh-token";
+        RefreshTokenData storedToken = storedToken(presentedToken, Instant.now().plus(Duration.ofDays(1)), null);
+        given(refreshTokenRepository.findByTokenHash(sha256Hex(presentedToken))).willReturn(Optional.of(storedToken));
+        given(adminUserRepository.findById(adminUser.getId())).willReturn(Optional.of(adminUser));
+        givenAccessTokenIsIssued();
+
+        // when
+        adminSessionService.refreshSession(presentedToken, CLIENT);
+
+        // then
+        RefreshTokenData rotatedToken = captureSavedToken();
+        assertThat(rotatedToken.getSessionId()).isEqualTo(storedToken.getSessionId());
+        assertThat(rotatedToken.getSessionStartedAt()).isEqualTo(storedToken.getSessionStartedAt());
+        assertThat(rotatedToken.getIpAddress()).isEqualTo(CLIENT.ipAddress());
+        assertThat(rotatedToken.getUserAgent()).isEqualTo(CLIENT.userAgent());
+    }
+
+    @Test
+    void shouldListOneSessionPerSessionIdMarkingTheCurrentOne() {
+        // given
+        RefreshTokenData currentSessionOlder = storedToken("a", Instant.now().plus(Duration.ofDays(1)), null);
+        RefreshTokenData currentSessionNewer = storedToken("b", Instant.now().plus(Duration.ofDays(1)), null);
+        currentSessionNewer.setSessionId(currentSessionOlder.getSessionId());
+        currentSessionNewer.setCreatedAt(currentSessionOlder.getCreatedAt().plusSeconds(30));
+        RefreshTokenData otherSession = storedToken("c", Instant.now().plus(Duration.ofDays(1)), null);
+        otherSession.setCreatedAt(currentSessionOlder.getCreatedAt().minusSeconds(30));
+        given(refreshTokenRepository.findByAdminUserIdAndUsedAtIsNullAndExpiresAtAfter(eq(adminUser.getId()), any(Instant.class)))
+                .willReturn(List.of(currentSessionOlder, currentSessionNewer, otherSession));
+
+        // when
+        List<SessionInfo> sessions = adminSessionService.listSessions(adminUser.getId(), currentSessionOlder.getSessionId());
+
+        // then
+        assertThat(sessions).extracting(SessionInfo::id)
+                .containsExactly(currentSessionOlder.getSessionId(), otherSession.getSessionId());
+        assertThat(sessions).extracting(SessionInfo::current).containsExactly(true, false);
+        assertThat(sessions.getFirst().lastActiveAt()).isEqualTo(currentSessionNewer.getCreatedAt());
+    }
+
+    @Test
+    void shouldRevokeSessionOwnedByAdmin() {
+        // given
+        UUID sessionId = UUID.randomUUID();
+        given(refreshTokenRepository.deleteByAdminUserIdAndSessionId(adminUser.getId(), sessionId)).willReturn(2L);
+
+        // when & then
+        adminSessionService.revokeSession(adminUser.getId(), sessionId);
+        verify(refreshTokenRepository).deleteByAdminUserIdAndSessionId(adminUser.getId(), sessionId);
+    }
+
+    @Test
+    void shouldFailRevokingUnknownSession() {
+        // given
+        UUID sessionId = UUID.randomUUID();
+        given(refreshTokenRepository.deleteByAdminUserIdAndSessionId(adminUser.getId(), sessionId)).willReturn(0L);
+
+        // when & then
+        assertThatThrownBy(() -> adminSessionService.revokeSession(adminUser.getId(), sessionId))
+                .isInstanceOf(NoSuchElementException.class);
+    }
+
+    @Test
+    void shouldRevokeAllSessionsExceptTheCurrentOne() {
+        // given
+        UUID currentSessionId = UUID.randomUUID();
+
+        // when
+        adminSessionService.revokeOtherSessions(adminUser.getId(), currentSessionId);
+
+        // then
+        verify(refreshTokenRepository).deleteByAdminUserIdAndSessionIdNot(adminUser.getId(), currentSessionId);
     }
 
     @Test
@@ -204,7 +286,7 @@ class AdminSessionServiceImplTest {
     }
 
     private void givenAccessTokenIsIssued() {
-        given(jwtService.generateToken(adminUser.getId(), adminUser.getUsername(), adminUser.getRole()))
+        given(jwtService.generateToken(eq(adminUser.getId()), eq(adminUser.getUsername()), eq(adminUser.getRole()), any(UUID.class)))
                 .willReturn(ACCESS_TOKEN);
         given(jwtService.expirationOf(ACCESS_TOKEN)).willReturn(ACCESS_TOKEN_EXPIRES_AT);
     }
@@ -219,6 +301,8 @@ class AdminSessionServiceImplTest {
         return RefreshTokenData.builder()
                 .id(UUID.randomUUID())
                 .adminUserId(adminUser.getId())
+                .sessionId(UUID.randomUUID())
+                .sessionStartedAt(Instant.now().minusSeconds(3600))
                 .tokenHash(sha256Hex(rawToken))
                 .createdAt(Instant.now().minusSeconds(60))
                 .expiresAt(expiresAt)

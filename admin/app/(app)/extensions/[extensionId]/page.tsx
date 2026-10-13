@@ -4,6 +4,7 @@ import { adminApiFetch } from "@/lib/api-client";
 import { CreateSlotForm } from "@/components/CreateSlotForm";
 import { CreateKeyForm } from "@/components/CreateKeyForm";
 import { RevokeKeyButton } from "@/components/RevokeKeyButton";
+import { getApiKeyExpiry, type ApiKeyExpiry } from "@/lib/api-key-expiry";
 import { DeleteExtensionButton } from "@/components/DeleteExtensionButton";
 import { DeleteSlotButton } from "@/components/DeleteSlotButton";
 import type { components } from "@/lib/api-types";
@@ -55,6 +56,34 @@ export default async function ExtensionDetailPage({
     const slots = slotsData.slots ?? [];
     const keys = keysData.keys ?? [];
 
+    const renderExpiry = (expiry: ApiKeyExpiry) => {
+        switch (expiry.status) {
+            case "none":
+                return null;
+            case "valid":
+                return (
+                    <p className="text-sm text-text-muted">
+                        {t("extensionDetail.keyExpiresAt", { date: expiry.expiresAt.toLocaleDateString(locale) })}
+                    </p>
+                );
+            case "expiring":
+                return (
+                    <p className="text-sm font-medium text-amber-600">
+                        {t("extensionDetail.keyExpiringSoon", {
+                            date: expiry.expiresAt.toLocaleDateString(locale),
+                            days: expiry.daysLeft,
+                        })}
+                    </p>
+                );
+            case "expired":
+                return (
+                    <p className="text-sm font-medium text-danger">
+                        {t("extensionDetail.keyExpired", { date: expiry.expiresAt.toLocaleDateString(locale) })}
+                    </p>
+                );
+        }
+    };
+
     return (
         <main className="p-8 space-y-8 max-w-4xl">
             <div>
@@ -89,7 +118,11 @@ export default async function ExtensionDetailPage({
                                 className="panel flex items-center justify-between hover:border-primary transition-colors"
                             >
                                 <Link
-                                    href={`/extensions/${extensionId}/documents/${slot.slotKey}`}
+                                    href={
+                                        slot.contentType === "BINARY" || slot.contentType === "BINARY_COLLECTION"
+                                            ? `/extensions/${extensionId}/assets/${slot.slotKey}`
+                                            : `/extensions/${extensionId}/documents/${slot.slotKey}`
+                                    }
                                     className="flex-1"
                                 >
                                     <p className="font-medium">{slot.slotKey}</p>
@@ -118,6 +151,7 @@ export default async function ExtensionDetailPage({
                                     <p className="text-sm text-text-muted">
                                         {key.scope} · {key.revoked ? t("extensionDetail.keyRevoked") : t("extensionDetail.keyActive")}
                                     </p>
+                                    {!key.revoked && renderExpiry(getApiKeyExpiry(key.expiresAt))}
                                 </div>
                                 {!key.revoked && (
                                     <RevokeKeyButton extensionId={extensionId} keyId={key.id} />

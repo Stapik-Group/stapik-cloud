@@ -2,6 +2,7 @@ package pl.stapik.cloud.asset.dto;
 
 import lombok.Builder;
 import lombok.Data;
+import pl.stapik.cloud.asset.AssetFilename;
 
 import java.util.UUID;
 
@@ -20,7 +21,7 @@ public class AssetIdentifier {
         return AssetIdentifier.builder()
                 .extensionId(extensionId)
                 .slotKey(slotKey)
-                .filename(filename)
+                .filename(filename == null ? null : AssetFilename.normalize(filename))
                 .build();
     }
 }

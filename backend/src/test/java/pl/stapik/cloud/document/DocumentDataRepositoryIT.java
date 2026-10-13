@@ -6,6 +6,7 @@ import org.springframework.transaction.annotation.Transactional;
 import pl.stapik.cloud.AbstractIntegrationTest;
 import org.springframework.dao.DataIntegrityViolationException;
 import pl.stapik.cloud.document.data.DocumentData;
+import pl.stapik.cloud.document.dto.DocumentChangeSummary;
 import pl.stapik.cloud.document.dto.DocumentPartitionSummary;
 import pl.stapik.cloud.documentslot.data.ConflictStrategy;
 import pl.stapik.cloud.documentslot.data.ContentType;
@@ -49,6 +50,22 @@ class DocumentDataRepositoryIT extends AbstractIntegrationTest {
         assertThat(result.get().getDocumentSlotId()).isEqualTo(slot.getId());
         assertThat(result.get().getContent()).isEqualTo("some content");
         assertThat(result.get().getContentHash()).isEqualTo("hash1");
+    }
+
+    @Test
+    void shouldFindForUpdateByDocumentSlotIdAndPartitionKey() {
+        // given
+        ExtensionData extension = createExtension();
+        DocumentSlotData slot = createDocumentSlot(extension.getId());
+        createDocument(slot.getId());
+
+        // when
+        Optional<DocumentData> result = documentRepository
+                .findForUpdateByDocumentSlotIdAndPartitionKey(slot.getId(), DocumentData.DEFAULT_PARTITION_KEY);
+
+        // then
+        assertThat(result).isPresent();
+        assertThat(result.get().getContent()).isEqualTo("some content");
     }
 
     @Test
@@ -119,9 +136,9 @@ class DocumentDataRepositoryIT extends AbstractIntegrationTest {
         assertThat(summaries)
                 .extracting(DocumentPartitionSummary::getPartitionKey)
                 .containsExactly("2023", "2024");
-        assertThat(summaries.get(0).getSizeBytes()).isEqualTo(16);
-        assertThat(summaries.get(0).getContentHash()).isEqualTo("hash-2023");
-        assertThat(summaries.get(0).getUpdatedAt()).isEqualTo(updatedAt);
+        assertThat(summaries.getFirst().getSizeBytes()).isEqualTo(16);
+        assertThat(summaries.getFirst().getContentHash()).isEqualTo("hash-2023");
+        assertThat(summaries.getFirst().getUpdatedAt()).isEqualTo(updatedAt);
     }
 
     @Test
@@ -138,14 +155,56 @@ class DocumentDataRepositoryIT extends AbstractIntegrationTest {
         assertThat(summaries).isEmpty();
     }
 
+    @Test
+    void shouldFindOnlyDocumentsChangedAfterGivenMomentIncludingDeleted() {
+        // given
+        ExtensionData extension = createExtension();
+        DocumentSlotData slot = createDocumentSlot(extension.getId());
+        Instant since = Instant.parse("2026-07-18T10:00:00Z");
+        createDocument(slot.getId(), "2022", "old year", 8, null, since);
+        createDocument(slot.getId(), "2023", "newer year", 10, null, since.plusSeconds(10));
+        createDocument(slot.getId(), "2024", "deleted year", 12, since.plusSeconds(20), since.plusSeconds(20));
+
+        // when
+        List<DocumentChangeSummary> changes = documentRepository.findChanges(extension.getId(), since);
+
+        // then
+        assertThat(changes)
+                .extracting(DocumentChangeSummary::getPartitionKey)
+                .containsExactly("2023", "2024");
+        assertThat(changes.getFirst().getSlotKey()).isEqualTo("slot-key");
+        assertThat(changes.getFirst().getContentHash()).isEqualTo("hash-2023");
+        assertThat(changes.getFirst().getDeletedAt()).isNull();
+        assertThat(changes.get(1).getDeletedAt()).isEqualTo(since.plusSeconds(20));
+    }
+
+    @Test
+    void shouldNotFindChangesOfOtherExtension() {
+        // given
+        ExtensionData extension = createExtension();
+        DocumentSlotData slot = createDocumentSlot(extension.getId());
+        createDocument(slot.getId());
+
+        // when
+        List<DocumentChangeSummary> changes = documentRepository
+                .findChanges(UUID.randomUUID(), Instant.parse("2000-01-01T00:00:00Z"));
+
+        // then
+        assertThat(changes).isEmpty();
+    }
+
     private void createDocument(UUID documentSlotId, String partitionKey, String content, long sizeBytes, Instant deletedAt) {
+        createDocument(documentSlotId, partitionKey, content, sizeBytes, deletedAt, Instant.parse("2026-07-18T10:00:00Z"));
+    }
+
+    private void createDocument(UUID documentSlotId, String partitionKey, String content, long sizeBytes, Instant deletedAt, Instant updatedAt) {
         DocumentData documentData = DocumentData.builder()
                 .documentSlotId(documentSlotId)
                 .partitionKey(partitionKey)
                 .content(content)
                 .contentHash("hash-" + partitionKey)
                 .sizeBytes(sizeBytes)
-                .updatedAt(Instant.parse("2026-07-18T10:00:00Z"))
+                .updatedAt(updatedAt)
                 .deletedAt(deletedAt)
                 .build();
         documentRepository.save(documentData);

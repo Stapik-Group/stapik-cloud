@@ -9,21 +9,30 @@ import org.jspecify.annotations.NonNull;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 import pl.stapik.cloud.apikey.data.ApiKeyData;
+import pl.stapik.cloud.apikey.ApiKeyProperties;
 import pl.stapik.cloud.apikey.ApiKeyRepository;
 import pl.stapik.cloud.apikey.data.ApiKeyScope;
-import pl.stapik.cloud.common.crypto.HashingService;
+import pl.stapik.cloud.common.crypto.ApiKeyHasher;
+import pl.stapik.cloud.extension.ExtensionRepository;
 
 import java.io.IOException;
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 
 @RequiredArgsConstructor
 public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
 
     private static final String HEADER_NAME = "x-api-key";
+    public static final String EXPIRES_AT_HEADER_NAME = "X-Api-Key-Expires-At";
     private static final int PREFIX_LENGTH = 8;
+    private static final Duration LAST_USED_UPDATE_INTERVAL = Duration.ofMinutes(1);
 
     private final ApiKeyRepository apiKeyRepository;
-    private final HashingService hashingService;
+    private final ExtensionRepository extensionRepository;
+    private final ApiKeyHasher apiKeyHasher;
+    private final ApiKeyProperties apiKeyProperties;
+    private final Clock clock;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, @NonNull HttpServletResponse response, @NonNull FilterChain filterChain)
@@ -34,19 +43,24 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
             String prefix = rawKey.substring(0, PREFIX_LENGTH);
 
             apiKeyRepository.findByKeyPrefixAndRevokedFalse(prefix)
-                    .filter(apiKey -> hashingService.matches(rawKey, apiKey.getHashedKey()))
+                    .filter(apiKey -> apiKeyHasher.matches(rawKey, apiKey.getHashedKey()))
                     .filter(this::notExpired)
-                    .ifPresent(this::authenticate);
+                    .filter(this::extensionEnabled)
+                    .ifPresent(apiKey -> authenticate(apiKey, rawKey, response));
         }
 
         filterChain.doFilter(request, response);
     }
 
     private boolean notExpired(ApiKeyData apiKey) {
-        return apiKey.getExpiresAt() == null || apiKey.getExpiresAt().isAfter(Instant.now());
+        return apiKey.getExpiresAt() == null || apiKey.getExpiresAt().isAfter(Instant.now(clock));
     }
 
-    private void authenticate(ApiKeyData apiKey) {
+    private boolean extensionEnabled(ApiKeyData apiKey) {
+        return extensionRepository.existsByIdAndEnabledTrue(apiKey.getExtensionId());
+    }
+
+    private void authenticate(ApiKeyData apiKey, String rawKey, HttpServletResponse response) {
         ApiKeyPrincipal principal = new ApiKeyPrincipal(
                 apiKey.getId(),
                 apiKey.getExtensionId(),
@@ -55,7 +69,30 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
         );
         SecurityContextHolder.getContext().setAuthentication(new ApiKeyAuthenticationToken(principal));
 
-        apiKey.setLastUsedAt(Instant.now());
+        announceApproachingExpiry(apiKey, response);
+        recordUsage(apiKey, rawKey);
+    }
+
+    private void announceApproachingExpiry(ApiKeyData apiKey, HttpServletResponse response) {
+        Instant expiresAt = apiKey.getExpiresAt();
+        if (expiresAt != null && expiresAt.isBefore(Instant.now(clock).plus(apiKeyProperties.expiryWarningPeriod()))) {
+            response.setHeader(EXPIRES_AT_HEADER_NAME, expiresAt.toString());
+        }
+    }
+
+    private void recordUsage(ApiKeyData apiKey, String rawKey) {
+        Instant now = Instant.now();
+        boolean upgradeLegacyHash = apiKeyHasher.isLegacy(apiKey.getHashedKey());
+        boolean lastUsedStale = apiKey.getLastUsedAt() == null
+                || apiKey.getLastUsedAt().isBefore(now.minus(LAST_USED_UPDATE_INTERVAL));
+        if (!upgradeLegacyHash && !lastUsedStale) {
+            return;
+        }
+
+        if (upgradeLegacyHash) {
+            apiKey.setHashedKey(apiKeyHasher.hash(rawKey));
+        }
+        apiKey.setLastUsedAt(now);
         apiKeyRepository.save(apiKey);
     }
 

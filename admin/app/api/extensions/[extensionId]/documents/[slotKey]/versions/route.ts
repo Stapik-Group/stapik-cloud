@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminApiFetch } from "@/lib/api-client";
 
 export async function GET(
-    _request: NextRequest,
+    request: NextRequest,
     { params }: { params: Promise<{ extensionId: string; slotKey: string }> },
 ) {
     const { extensionId, slotKey } = await params;
 
     const backendResponse = await adminApiFetch(
-        `/api/admin/extensions/${extensionId}/documents/${slotKey}/versions`,
+        `/api/admin/extensions/${extensionId}/documents/${slotKey}/versions${request.nextUrl.search}`,
     );
 
     const data = await backendResponse.json();

@@ -11,6 +11,7 @@ import pl.stapik.cloud.admin.data.RefreshTokenData;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -29,6 +30,7 @@ class RefreshTokenRepositoryIT extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        refreshTokenRepository.deleteAll();
         adminUser = createAdminUser("refresh-token-user");
     }
 
@@ -107,6 +109,8 @@ class RefreshTokenRepositoryIT extends AbstractIntegrationTest {
     private void saveToken(AdminUserData owner, String tokenHash, Instant expiresAt, Instant usedAt) {
         refreshTokenRepository.saveAndFlush(RefreshTokenData.builder()
                 .adminUserId(owner.getId())
+                .sessionId(UUID.randomUUID())
+                .sessionStartedAt(Instant.now())
                 .tokenHash(tokenHash)
                 .createdAt(Instant.now())
                 .expiresAt(expiresAt)

@@ -3,55 +3,22 @@
 import { useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/LocaleProvider";
-import { INDENT, indentSelection, outdentSelection } from "@/lib/text-indent";
-
-function removeWhitespaceOutsideStrings(json: string): string {
-    let result = "";
-    let isInsideString = false;
-    let isEscaped = false;
-
-    for (const character of json) {
-        if (isInsideString) {
-            result += character;
-            if (isEscaped) {
-                isEscaped = false;
-            } else if (character === "\\") {
-                isEscaped = true;
-            } else if (character === "\"") {
-                isInsideString = false;
-            }
-        } else if (character === "\"") {
-            isInsideString = true;
-            result += character;
-        } else if (!/\s/.test(character)) {
-            result += character;
-        }
-    }
-
-    return result;
-}
-
-function formatForEditing(rawContent: string): string {
-    try {
-        const prettyContent = JSON.stringify(JSON.parse(rawContent), null, INDENT);
-        const isLossless =
-            removeWhitespaceOutsideStrings(prettyContent) === removeWhitespaceOutsideStrings(rawContent);
-        return isLossless ? prettyContent : rawContent;
-    } catch {
-        return rawContent;
-    }
-}
+import { documentApiUrl } from "@/lib/document-api-url";
+import { formatForEditing } from "@/lib/json-format";
+import { indentSelection, outdentSelection } from "@/lib/text-indent";
 
 export function JsonDocumentEditor({
                                        extensionId,
                                        slotKey,
+                                       partition,
                                        storedContent,
-                                       lastKnownUpdate,
+                                       contentHash,
                                    }: {
     extensionId: string;
     slotKey: string;
+    partition?: string;
     storedContent: string;
-    lastKnownUpdate: string;
+    contentHash: string;
 }) {
     const router = useRouter();
     const { t } = useTranslation();
@@ -121,12 +88,10 @@ export function JsonDocumentEditor({
 
         setIsSaving(true);
         try {
-            const response = await fetch(`/api/extensions/${extensionId}/documents/${slotKey}`, {
+            const response = await fetch(documentApiUrl(extensionId, slotKey, "", partition), {
                 method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                // lastKnownUpdate must be passed back as the exact string received from the API:
-                // parsing it into a Date would cut microseconds and cause false conflicts.
-                body: JSON.stringify({ content: text, clientLastKnownUpdate: lastKnownUpdate }),
+                headers: { "Content-Type": "application/json", "If-Match": `"${contentHash}"` },
+                body: JSON.stringify({ content: text }),
             });
 
             if (response.status === 409) {

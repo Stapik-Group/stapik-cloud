@@ -10,6 +10,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import pl.stapik.cloud.AbstractIntegrationTest;
 
 import javax.sql.DataSource;
@@ -69,6 +70,7 @@ class DocumentDataDelegateTest extends AbstractIntegrationTest {
                         .header(API_KEY_HEADER, rawApiKey))
                 .andExpect(status().isOk())
                 .andExpect(content().json(expectedResponseBody, JsonCompareMode.LENIENT))
+                .andExpect(header().string("ETag", "\"hash1\""))
                 .andExpect(jsonPath("$.slotKey").value("notes"))
                 .andExpect(jsonPath("$.content").value("hello world"));
     }
@@ -105,7 +107,26 @@ class DocumentDataDelegateTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(content().json(expectedResponseBody, JsonCompareMode.LENIENT))
                 .andExpect(jsonPath("$.contentHash").isNotEmpty())
+                .andExpect(header().exists("ETag"))
                 .andExpect(jsonPath("$.updatedAt").isNotEmpty());
+    }
+
+    @Test
+    void shouldOverwriteExistingDocumentWhenIfMatchEqualsCurrentETag() throws Exception {
+        // given
+        UUID slotId = UUID.randomUUID();
+        insertDocumentSlot(slotId, extensionId, "etag-slot");
+        insertDocument(slotId, "server content", "hash-server");
+
+        // when & then
+        mockMvc.perform(put("/api/v1/documents/{slotKey}", "etag-slot")
+                        .header(API_KEY_HEADER, rawApiKey)
+                        .header("If-Match", "\"hash-server\"")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\": \"client content\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").value("client content"))
+                .andExpect(header().exists("ETag"));
     }
 
     @Test
@@ -133,9 +154,11 @@ class DocumentDataDelegateTest extends AbstractIntegrationTest {
         // when & then
         mockMvc.perform(put("/api/v1/documents/{slotKey}", "conflict-slot")
                         .header(API_KEY_HEADER, rawApiKey)
+                        .header("If-Match", "\"hash-stale\"")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andExpect(status().isConflict())
+                .andExpect(header().string("ETag", "\"hash-server\""))
                 .andExpect(jsonPath("$.content").value("server content"));
     }
 
@@ -189,13 +212,7 @@ class DocumentDataDelegateTest extends AbstractIntegrationTest {
 
         // when
         for (int writeNumber = 1; writeNumber <= writesCount; writeNumber++) {
-            String requestBody = "{\"content\": \"content-" + writeNumber + "\", "
-                    + "\"clientLastKnownUpdate\": \"2999-01-01T00:00:00Z\"}";
-            mockMvc.perform(put("/api/v1/documents/{slotKey}", "limited-slot")
-                            .header(API_KEY_HEADER, rawApiKey)
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(requestBody))
-                    .andExpect(status().isOk());
+            putDocument("/api/v1/documents/{slotKey}", "content-" + writeNumber, "limited-slot");
         }
 
         // then
@@ -203,6 +220,20 @@ class DocumentDataDelegateTest extends AbstractIntegrationTest {
                         .header(API_KEY_HEADER, rawApiKey))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.versions.length()").value(maxVersionsRetained));
+    }
+
+    @Test
+    void shouldReportDeviceThatWroteVersionInHistory() throws Exception {
+        // given
+        insertDocumentSlot(UUID.randomUUID(), extensionId, "device-slot");
+        putDocument("/api/v1/documents/{slotKey}", "from device", "device-slot");
+
+        // when & then
+        mockMvc.perform(get("/api/v1/documents/{slotKey}/versions", "device-slot")
+                        .header(API_KEY_HEADER, rawApiKey))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.versions[0].deviceId").isNotEmpty())
+                .andExpect(jsonPath("$.versions[0].deviceLabel").value("test-key"));
     }
 
     @Test
@@ -388,21 +419,104 @@ class DocumentDataDelegateTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.content").value("main content"));
     }
 
+    @Test
+    void shouldListChangesSinceGivenMoment() throws Exception {
+        // given
+        UUID slotId = UUID.randomUUID();
+        insertDocumentSlot(slotId, extensionId, "notes");
+        insertDocument(slotId, "hello world", "hash1");
+
+        // when & then
+        mockMvc.perform(get("/api/v1/changes").param("since", Instant.now().minusSeconds(3600).toString())
+                        .header(API_KEY_HEADER, rawApiKey))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.serverTime").isNotEmpty())
+                .andExpect(jsonPath("$.changes.length()").value(1))
+                .andExpect(jsonPath("$.changes[0].slotKey").value("notes"))
+                .andExpect(jsonPath("$.changes[0].partition").doesNotExist())
+                .andExpect(jsonPath("$.changes[0].contentHash").value("hash1"))
+                .andExpect(jsonPath("$.changes[0].deleted").value(false));
+    }
+
+    @Test
+    void shouldListPartitionAndDeletedDocumentInChanges() throws Exception {
+        // given
+        insertDocumentSlot(UUID.randomUUID(), extensionId, "calendar.json");
+        putDocument("/api/v1/documents/{slotKey}/partitions/{partition}", "year 2024", "calendar.json", "2024");
+        mockMvc.perform(delete("/api/v1/documents/{slotKey}/partitions/{partition}", "calendar.json", "2024")
+                        .header(API_KEY_HEADER, rawApiKey))
+                .andExpect(status().isNoContent());
+
+        // when & then
+        mockMvc.perform(get("/api/v1/changes").param("since", Instant.now().minusSeconds(3600).toString())
+                        .header(API_KEY_HEADER, rawApiKey))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.changes.length()").value(1))
+                .andExpect(jsonPath("$.changes[0].slotKey").value("calendar.json"))
+                .andExpect(jsonPath("$.changes[0].partition").value("2024"))
+                .andExpect(jsonPath("$.changes[0].deleted").value(true));
+    }
+
+    @Test
+    void shouldReturnNoChangesWhenNothingChangedSinceGivenMoment() throws Exception {
+        // given
+        UUID slotId = UUID.randomUUID();
+        insertDocumentSlot(slotId, extensionId, "notes");
+        insertDocument(slotId, "hello world", "hash1");
+
+        // when & then
+        mockMvc.perform(get("/api/v1/changes").param("since", Instant.now().plusSeconds(3600).toString())
+                        .header(API_KEY_HEADER, rawApiKey))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.changes.length()").value(0));
+    }
+
+    @Test
+    void shouldNotListChangesOfOtherExtension() throws Exception {
+        // given
+        UUID otherExtensionId = UUID.randomUUID();
+        insertExtension(otherExtensionId, "other-doc-test-ext");
+        UUID otherSlotId = UUID.randomUUID();
+        insertDocumentSlot(otherSlotId, otherExtensionId, "foreign");
+        insertDocument(otherSlotId, "foreign content", "hash-foreign");
+
+        // when & then
+        mockMvc.perform(get("/api/v1/changes").param("since", Instant.now().minusSeconds(3600).toString())
+                        .header(API_KEY_HEADER, rawApiKey))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.changes.length()").value(0));
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenSinceIsMissing() throws Exception {
+        // when & then
+        mockMvc.perform(get("/api/v1/changes").header(API_KEY_HEADER, rawApiKey))
+                .andExpect(status().isBadRequest());
+    }
+
     private void putDocument(String urlTemplate, String content, Object... urlVariables) throws Exception {
-        String requestBody = "{\"content\": \"" + content + "\", \"clientLastKnownUpdate\": \"2999-01-01T00:00:00Z\"}";
-        mockMvc.perform(put(urlTemplate, urlVariables)
-                        .header(API_KEY_HEADER, rawApiKey)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody))
-                .andExpect(status().isOk());
+        String currentETag = mockMvc.perform(get(urlTemplate, urlVariables).header(API_KEY_HEADER, rawApiKey))
+                .andReturn().getResponse().getHeader("ETag");
+        MockHttpServletRequestBuilder request = put(urlTemplate, urlVariables)
+                .header(API_KEY_HEADER, rawApiKey)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"content\": \"" + content + "\"}");
+        if (currentETag != null) {
+            request.header("If-Match", currentETag);
+        }
+        mockMvc.perform(request).andExpect(status().isOk());
     }
 
     private void insertExtension(UUID id) throws Exception {
+        insertExtension(id, "doc-test-ext");
+    }
+
+    private void insertExtension(UUID id, String slug) throws Exception {
         try (Connection connection = dataSource.getConnection()) {
             String sql = "INSERT INTO extension (id, slug, display_name, enabled, created_at) VALUES (?, ?, ?, ?, ?)";
             try (PreparedStatement ps = connection.prepareStatement(sql)) {
                 ps.setObject(1, id);
-                ps.setString(2, "doc-test-ext");
+                ps.setString(2, slug);
                 ps.setString(3, "Doc Test Extension");
                 ps.setBoolean(4, true);
                 ps.setTimestamp(5, java.sql.Timestamp.from(Instant.now()));

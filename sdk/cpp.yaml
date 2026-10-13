@@ -1,0 +1,5 @@
+generatorName: cpp-restsdk
+apiPackage: pl.stapik.cloud.client.api
+modelPackage: pl.stapik.cloud.client.model
+additionalProperties:
+  packageName: StapikCloudClient

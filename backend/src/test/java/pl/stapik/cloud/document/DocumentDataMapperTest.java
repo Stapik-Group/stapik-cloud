@@ -5,6 +5,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import pl.stapik.cloud.admin.data.AdminDocumentResponse;
 import pl.stapik.cloud.common.mapper.DateTimeMapperImpl;
 import pl.stapik.cloud.document.data.DocumentData;
 import pl.stapik.cloud.document.data.DocumentVersionData;
@@ -53,15 +54,41 @@ class DocumentDataMapperTest {
     }
 
     @Test
+    void shouldFlagEncryptedContentInAdminResponse() {
+        // Given
+        DocumentData encrypted = DocumentData.builder()
+                .content("{\"format\":\"stapik-e2e\",\"version\":1}")
+                .contentHash("hash-1")
+                .updatedAt(Instant.parse("2026-07-18T10:00:00Z"))
+                .build();
+        DocumentData plain = DocumentData.builder()
+                .content("{\"foo\": \"bar\"}")
+                .contentHash("hash-2")
+                .updatedAt(Instant.parse("2026-07-18T10:00:00Z"))
+                .build();
+
+        // When
+        AdminDocumentResponse encryptedResponse = documentMapper.toAdminDocumentResponse(encrypted, "slot-key-1");
+        AdminDocumentResponse plainResponse = documentMapper.toAdminDocumentResponse(plain, "slot-key-1");
+
+        // Then
+        assertThat(encryptedResponse.getEncrypted()).isTrue();
+        assertThat(plainResponse.getEncrypted()).isFalse();
+    }
+
+    @Test
     void shouldMapVersionToVersionResponse() {
         // Given
         UUID versionId = UUID.randomUUID();
+        UUID deviceId = UUID.randomUUID();
         Instant savedAt = Instant.parse("2026-07-18T12:30:00Z");
 
         DocumentVersionData version = DocumentVersionData.builder()
                 .id(versionId)
                 .savedAt(savedAt)
                 .reason(VersionReason.MANUAL_RESTORE)
+                .deviceId(deviceId)
+                .deviceLabel("pixel-7")
                 .build();
 
         // When
@@ -72,6 +99,8 @@ class DocumentDataMapperTest {
         assertThat(response.getId()).isEqualTo(versionId);
         assertThat(response.getSavedAt()).isEqualTo(savedAt.atOffset(ZoneOffset.UTC));
         assertThat(response.getReason()).isEqualTo(MANUAL_RESTORE);
+        assertThat(response.getDeviceId()).isEqualTo(deviceId);
+        assertThat(response.getDeviceLabel()).isEqualTo("pixel-7");
     }
 
     @Test

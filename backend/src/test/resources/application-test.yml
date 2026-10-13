@@ -1,7 +1,13 @@
 stapik-cloud:
+  rate-limit:
+    login:
+      ip-requests-per-minute: 1000
   security:
     jwt:
       secret: test-only-secret-never-use-in-production-aaaaaaaaaaaaaaaaaaaaaaaa
+  encryption:
+    active-key-id: 1
+    keys: 1:PDms+WRRfqIr9SoMHLzh5COf6LMKKYmpz2lyNSXhy1I=
   admin-bootstrap:
     username: test-admin
     password: test-admin-password

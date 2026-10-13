@@ -3,7 +3,9 @@ package pl.stapik.cloud.asset.impl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import pl.stapik.cloud.asset.AssetMimeTypePolicy;
 import pl.stapik.cloud.asset.AssetRepository;
 import pl.stapik.cloud.asset.AssetService;
 import pl.stapik.cloud.asset.AssetTooLargeException;
@@ -13,7 +15,9 @@ import pl.stapik.cloud.asset.storage.AssetStorage;
 import pl.stapik.cloud.documentslot.data.DocumentSlotData;
 import pl.stapik.cloud.documentslot.DocumentSlotRepository;
 
+import java.io.BufferedInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.time.Instant;
 import java.util.List;
@@ -24,9 +28,12 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AssetServiceImpl implements AssetService {
 
+    private static final String DEFAULT_MIME_TYPE = "application/octet-stream";
+
     private final AssetRepository assetRepository;
     private final DocumentSlotRepository documentSlotRepository;
     private final AssetStorage assetStorage;
+    private final AssetMimeTypePolicy assetMimeTypePolicy;
 
     @Override
     public List<AssetData> list(AssetIdentifier identifier) {
@@ -34,8 +41,9 @@ public class AssetServiceImpl implements AssetService {
         return assetRepository.findByDocumentSlotId(slot.getId());
     }
 
+    @Transactional
     @Override
-    public AssetData upload(AssetIdentifier identifier, MultipartFile file) {
+    public AssetData upload(AssetIdentifier identifier, MultipartFile file, String expectedChecksumSha256) {
         DocumentSlotData slot = requireSlot(identifier.getExtensionId(), identifier.getSlotKey());
 
         if (file.getSize() > slot.getMaxSizeBytes()) {
@@ -43,25 +51,36 @@ public class AssetServiceImpl implements AssetService {
         }
 
         try {
-            AssetStorage.StoredAsset stored = assetStorage.store(identifier.getExtensionId(), slot.getId(), identifier.getFilename(), file);
-
-            AssetData assetData = assetRepository.findByDocumentSlotIdAndFilename(slot.getId(), identifier.getFilename())
-                    .orElseGet(() -> AssetData.builder()
-                            .documentSlotId(slot.getId())
-                            .filename(identifier.getFilename())
-                            .createdAt(Instant.now())
-                            .build());
-
-            assetData.setMimeType(file.getContentType() != null ? file.getContentType() : "application/octet-stream");
-            assetData.setSizeBytes(stored.sizeBytes());
-            assetData.setStoragePath(stored.storagePath());
-            assetData.setChecksumSha256(stored.checksumSha256());
-            assetData.setUpdatedAt(Instant.now());
-
-            return assetRepository.save(assetData);
+            String mimeType = resolveMimeType(slot, identifier.getFilename(), file);
+            AssetStorage.StagedAsset staged = assetStorage.stage(identifier.getExtensionId(), slot.getId(), identifier.getFilename(), file, expectedChecksumSha256);
+            return saveAndPromote(slot, identifier.getFilename(), mimeType, staged);
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to store asset: " + identifier.getFilename(), e);
         }
+    }
+
+    @Transactional
+    @Override
+    public AssetData saveStoredAsset(DocumentSlotData slot, String filename, String mimeType, AssetStorage.StoredAsset stored) {
+        AssetData assetData = assetRepository.findByDocumentSlotIdAndFilename(slot.getId(), filename)
+                .orElseGet(() -> AssetData.builder()
+                        .documentSlotId(slot.getId())
+                        .filename(filename)
+                        .createdAt(Instant.now())
+                        .build());
+
+        assetData.setMimeType(mimeType != null ? mimeType : DEFAULT_MIME_TYPE);
+        assetData.setSizeBytes(stored.sizeBytes());
+        assetData.setStoragePath(stored.storagePath());
+        assetData.setChecksumSha256(stored.checksumSha256());
+        assetData.setUpdatedAt(Instant.now());
+
+        return assetRepository.saveAndFlush(assetData);
+    }
+
+    @Override
+    public AssetData getMetadata(AssetIdentifier identifier) {
+        return requireAsset(identifier);
     }
 
     @Override
@@ -83,6 +102,23 @@ public class AssetServiceImpl implements AssetService {
             throw new UncheckedIOException("Failed to delete asset file: " + identifier.getFilename(), e);
         }
         assetRepository.delete(assetData);
+    }
+
+    private AssetData saveAndPromote(DocumentSlotData slot, String filename, String mimeType, AssetStorage.StagedAsset staged) throws IOException {
+        try {
+            AssetData assetData = saveStoredAsset(slot, filename, mimeType, staged.stored());
+            assetStorage.promote(staged);
+            return assetData;
+        } catch (IOException | RuntimeException e) {
+            assetStorage.discardStaged(staged);
+            throw e;
+        }
+    }
+
+    private String resolveMimeType(DocumentSlotData slot, String filename, MultipartFile file) throws IOException {
+        try (InputStream content = new BufferedInputStream(file.getInputStream())) {
+            return assetMimeTypePolicy.resolve(slot, filename, content);
+        }
     }
 
     private AssetData requireAsset(AssetIdentifier identifier) {

@@ -5,12 +5,14 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import pl.stapik.cloud.audit.AuditLogRepository;
 import pl.stapik.cloud.audit.AuditLogService;
 import pl.stapik.cloud.audit.data.AuditLogEntryData;
 import pl.stapik.cloud.audit.dto.AuditLogEntryInfo;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -40,5 +42,11 @@ public class AuditLogServiceImpl implements AuditLogService {
         return extensionId != null
                 ? auditLogRepository.findByExtensionIdOrderByOccurredAtDesc(extensionId, pageable)
                 : auditLogRepository.findAllByOrderByOccurredAtDesc(pageable);
+    }
+
+    @Override
+    @Transactional
+    public int deleteEntriesOlderThan(Duration retention) {
+        return auditLogRepository.deleteOlderThan(Instant.now(clock).minus(retention));
     }
 }

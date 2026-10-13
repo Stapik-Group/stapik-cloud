@@ -8,8 +8,11 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import pl.stapik.cloud.document.data.DocumentData;
 import pl.stapik.cloud.document.dto.DocumentIdentifier;
+import pl.stapik.cloud.document.dto.DocumentWriter;
 import pl.stapik.cloud.document.dto.WriteResult;
 import pl.stapik.cloud.internal.api.DocumentsApiDelegate;
+import pl.stapik.cloud.internal.data.DocumentChangeListResponse;
+import pl.stapik.cloud.internal.data.DocumentChangeResponse;
 import pl.stapik.cloud.internal.data.DocumentPartitionListResponse;
 import pl.stapik.cloud.internal.data.DocumentPartitionResponse;
 import pl.stapik.cloud.internal.data.DocumentResponse;
@@ -18,6 +21,9 @@ import pl.stapik.cloud.internal.data.DocumentVersionResponse;
 import pl.stapik.cloud.internal.data.DocumentWriteRequest;
 import pl.stapik.cloud.security.apikey.ApiKeyPrincipal;
 
+import java.time.Clock;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -28,6 +34,7 @@ public class DocumentDelegate implements DocumentsApiDelegate {
 
     private final DocumentService documentService;
     private final DocumentMapper documentMapper;
+    private final Clock clock;
 
     @Override
     public ResponseEntity<DocumentResponse> getDocument(String slotKey) {
@@ -40,13 +47,13 @@ public class DocumentDelegate implements DocumentsApiDelegate {
     }
 
     @Override
-    public ResponseEntity<DocumentResponse> writeDocument(String slotKey, DocumentWriteRequest documentWriteRequest) {
-        return saveDocument(DocumentIdentifier.of(currentExtensionId(), slotKey), documentWriteRequest);
+    public ResponseEntity<DocumentResponse> writeDocument(String slotKey, DocumentWriteRequest documentWriteRequest, String ifMatch) {
+        return saveDocument(DocumentIdentifier.of(currentExtensionId(), slotKey), documentWriteRequest, ifMatch);
     }
 
     @Override
-    public ResponseEntity<DocumentResponse> writeDocumentPartition(String slotKey, String partition, DocumentWriteRequest documentWriteRequest) {
-        return saveDocument(DocumentIdentifier.of(currentExtensionId(), slotKey, partition), documentWriteRequest);
+    public ResponseEntity<DocumentResponse> writeDocumentPartition(String slotKey, String partition, DocumentWriteRequest documentWriteRequest, String ifMatch) {
+        return saveDocument(DocumentIdentifier.of(currentExtensionId(), slotKey, partition), documentWriteRequest, ifMatch);
     }
 
     @Override
@@ -88,22 +95,30 @@ public class DocumentDelegate implements DocumentsApiDelegate {
         return ResponseEntity.ok(new DocumentPartitionListResponse().partitions(partitions));
     }
 
-    private ResponseEntity<DocumentResponse> readDocument(DocumentIdentifier identifier) {
-        DocumentData documentData = documentService.getCurrent(identifier);
-        return ResponseEntity.ok(documentMapper.toResponse(documentData, identifier.getSlotKey()));
+    @Override
+    public ResponseEntity<DocumentChangeListResponse> listChanges(OffsetDateTime since) {
+        OffsetDateTime serverTime = OffsetDateTime.now(clock).withOffsetSameInstant(ZoneOffset.UTC);
+        List<DocumentChangeResponse> changes = documentService.listChanges(currentExtensionId(), since.toInstant()).stream()
+                .map(documentMapper::toChangeResponse)
+                .toList();
+
+        return ResponseEntity.ok(new DocumentChangeListResponse().serverTime(serverTime).changes(changes));
     }
 
-    private ResponseEntity<DocumentResponse> saveDocument(DocumentIdentifier identifier, DocumentWriteRequest documentWriteRequest) {
+    private ResponseEntity<DocumentResponse> readDocument(DocumentIdentifier identifier) {
+        DocumentData documentData = documentService.getCurrent(identifier);
+        return documentResponse(200, documentData, identifier.getSlotKey());
+    }
+
+    private ResponseEntity<DocumentResponse> saveDocument(DocumentIdentifier identifier, DocumentWriteRequest documentWriteRequest, String ifMatch) {
         WriteResult result = documentService.write(
                 identifier,
                 documentWriteRequest.getContent(),
-                documentWriteRequest.getClientLastKnownUpdate().toInstant()
+                DocumentETag.parse(ifMatch),
+                currentWriter()
         );
 
-        DocumentResponse response = documentMapper.toResponse(result.documentData(), identifier.getSlotKey());
-        return result.conflict()
-                ? ResponseEntity.status(409).body(response)
-                : ResponseEntity.ok(response);
+        return documentResponse(result.conflict() ? 409 : 200, result.documentData(), identifier.getSlotKey());
     }
 
     private ResponseEntity<Void> removeDocument(DocumentIdentifier identifier) {
@@ -120,17 +135,30 @@ public class DocumentDelegate implements DocumentsApiDelegate {
     }
 
     private ResponseEntity<DocumentResponse> restoreVersion(DocumentIdentifier identifier, UUID versionId) {
-        DocumentData restored = documentService.restoreVersion(identifier, versionId);
-        return ResponseEntity.ok(documentMapper.toResponse(restored, identifier.getSlotKey()));
+        DocumentData restored = documentService.restoreVersion(identifier, versionId, currentWriter());
+        return documentResponse(200, restored, identifier.getSlotKey());
+    }
+
+    private ResponseEntity<DocumentResponse> documentResponse(int status, DocumentData documentData, String slotKey) {
+        return ResponseEntity.status(status)
+                .eTag(DocumentETag.format(documentData.getContentHash()))
+                .body(documentMapper.toResponse(documentData, slotKey));
+    }
+
+    private DocumentWriter currentWriter() {
+        ApiKeyPrincipal principal = currentPrincipal();
+        return new DocumentWriter(principal.apiKeyId(), principal.keyLabel());
     }
 
     private UUID currentExtensionId() {
-        ApiKeyPrincipal principal = Optional.of(SecurityContextHolder.getContext())
+        return currentPrincipal().extensionId();
+    }
+
+    private ApiKeyPrincipal currentPrincipal() {
+        return Optional.of(SecurityContextHolder.getContext())
                 .map(SecurityContext::getAuthentication)
                 .map(Authentication::getPrincipal)
                 .map(p -> (ApiKeyPrincipal) p)
                 .orElseThrow();
-
-        return principal.extensionId();
     }
 }

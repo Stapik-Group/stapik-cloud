@@ -17,6 +17,7 @@ import pl.stapik.cloud.audit.dto.AuditLogEntryInfo;
 import pl.stapik.cloud.audit.impl.AuditLogServiceImpl;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
@@ -127,6 +128,19 @@ class AuditLogServiceTest {
         assertThat(result).isEqualTo(page);
         verify(auditLogRepository).findAllByOrderByOccurredAtDesc(PageRequest.of(0, 20));
         verify(auditLogRepository, never()).findByExtensionIdOrderByOccurredAtDesc(any(), any());
+    }
+
+    @Test
+    void shouldDeleteEntriesOlderThanRetentionRelativeToNow() {
+        // given
+        when(auditLogRepository.deleteOlderThan(any(Instant.class))).thenReturn(7);
+
+        // when
+        int deleted = auditLogService.deleteEntriesOlderThan(Duration.ofDays(10));
+
+        // then
+        assertThat(deleted).isEqualTo(7);
+        verify(auditLogRepository).deleteOlderThan(Instant.parse("2026-07-16T22:45:00Z"));
     }
 
     @Test

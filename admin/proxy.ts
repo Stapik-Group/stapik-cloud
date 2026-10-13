@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AUTH_COOKIE_NAME, REFRESH_COOKIE_NAME } from "@/lib/api-client";
+import { clientHeaders } from "@/lib/client-headers";
 import {
     exchangeRefreshToken,
     isAccessTokenExpiring,
@@ -8,6 +9,7 @@ import {
 } from "@/lib/auth-session";
 
 const PUBLIC_PATHS = ["/login"];
+const HSTS_MAX_AGE_SECONDS = 365 * 24 * 60 * 60;
 
 function redirectToLogin(request: NextRequest): NextResponse {
     const response = NextResponse.redirect(new URL("/login", request.url));
@@ -27,7 +29,18 @@ function continueWithRefreshedSession(request: NextRequest, tokens: LoginTokens)
     return response;
 }
 
+function withTransportSecurity(response: NextResponse): NextResponse {
+    if (process.env.FORCE_HTTPS === "true") {
+        response.headers.set("Strict-Transport-Security", `max-age=${HSTS_MAX_AGE_SECONDS}; includeSubDomains`);
+    }
+    return response;
+}
+
 export default async function proxy(request: NextRequest) {
+    return withTransportSecurity(await authenticate(request));
+}
+
+async function authenticate(request: NextRequest): Promise<NextResponse> {
     const { pathname } = request.nextUrl;
 
     if (
@@ -49,7 +62,7 @@ export default async function proxy(request: NextRequest) {
         return accessToken ? NextResponse.next() : redirectToLogin(request);
     }
 
-    const refreshResult = await exchangeRefreshToken(refreshToken);
+    const refreshResult = await exchangeRefreshToken(refreshToken, clientHeaders(request));
 
     if (refreshResult.status === "rejected") {
         return redirectToLogin(request);

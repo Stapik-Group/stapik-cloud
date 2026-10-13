@@ -78,6 +78,36 @@ class DocumentDataSlotDelegateTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void shouldCreateSlotWithExactAndWildcardMimeTypes() throws Exception {
+        // given
+        String requestBody = """
+                {"slotKey": "covers", "contentType": "BINARY_COLLECTION", "allowedMimeTypes": ["image/*", "application/pdf"]}
+                """;
+
+        // when & then
+        mockMvc.perform(post("/api/admin/extensions/{extensionId}/slots", extensionId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.allowedMimeTypes[0]").value("image/*"))
+                .andExpect(jsonPath("$.allowedMimeTypes[1]").value("application/pdf"));
+    }
+
+    @Test
+    void shouldRejectMalformedMimeType() throws Exception {
+        // given
+        String requestBody = """
+                {"slotKey": "covers", "contentType": "BINARY_COLLECTION", "allowedMimeTypes": ["image"]}
+                """;
+
+        // when & then
+        mockMvc.perform(post("/api/admin/extensions/{extensionId}/slots", extensionId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void shouldCreateSlotUsingDefaultsWhenOptionalFieldsOmitted() throws Exception {
         // given
         String requestBody = readResource("fixtures/slots/create-slot-minimal-request.json");

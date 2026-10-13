@@ -7,10 +7,11 @@ A self-hosted backend for the Stapik ecosystem of apps — document storage with
 - **Document slots** — per-extension key-value document storage (`JSON`, `TEXT`, `BINARY`, `BINARY_COLLECTION`), with configurable versioning and per-slot size limits
 - **Document partitions** — a slot can hold named partitions (e.g. one per year) next to its main document; each partition has its own content, version history and conflict handling, so large documents can be split and old parts fetched on demand
 - **Conflict resolution** — last-write-wins, optionally with a shadow copy preserving the discarded write-in version history
-- **Version history** — every write is recorded; restore any previous version as the current document
-- **Binary assets** — file upload/download/list per document slot, backed by local filesystem storage
+- **Version history** — every write is recorded; restore any previous version as the current document, or compare two versions with a structural JSON diff
+- **Binary assets** — file upload/download/list per document slot, backed by local filesystem storage; large files can be sent in resumable chunks (`/asset-uploads`) instead of a single multipart request
 - **API key authentication** — per-extension API keys (Argon2id-hashed, prefix lookup, read-only/read-write scopes) for app-facing endpoints
-- **Admin panel** — Next.js interface (JWT-secured) to manage extensions, document slots, API keys, browse document content and version history, and inspect the audit log
+- **Admin panel** — Next.js interface (JWT-secured) to manage extensions, document slots, API keys, browse document content, partitions and version history, see usage statistics on the dashboard, manage binary assets, and inspect the audit log
+- **Two-factor authentication (optional)** — TOTP (Google Authenticator, Aegis, any RFC 6238 app) with one-time backup codes; works fully offline, the secret never leaves the server except at enrollment
 - **Audit log** — tracks administrative actions (extension/slot/key lifecycle) with a paginated, filterable view
 - **Multilingual admin UI** — Polish, English and German interface with instant switching
 - **OpenAPI-first** — two specs, one for app-facing endpoints (`x-api-key`), one for the admin panel (JWT), both used to generate server and client types
@@ -53,7 +54,13 @@ Quick start on a Proxmox host:
 bash <(curl -fsSL https://raw.githubusercontent.com/Stapik-Group/stapik-cloud/master/deploy/proxmox/deploy.sh)
 ```
 
-Running the same command again updates an existing installation (pulls the latest code, rebuilds, restarts) without touching existing secrets or data.
+Running the same command again updates an existing installation (checks out the newest release, pulls its prebuilt images from the registry, restarts). Use `VERSION=v1.2.0 bash deploy.sh` to deploy a specific release without touching existing secrets or data.
+
+## CI and releases
+
+- Pull requests into `main`/`master` run the backend tests (Testcontainers), the admin lint and build (with API types generated from the OpenAPI spec) and validation of the deploy files. Plain pushes to branches run nothing.
+- Pushing a tag `vX.Y.Z` runs the same checks, then scans both Docker images with Trivy and publishes the images `ghcr.io/<owner>/stapik-cloud-backend` and `ghcr.io/<owner>/stapik-cloud-admin` (tags `X.Y.Z` and `X.Y`) and creates a GitHub release with the backend jar, the admin build, the Kotlin and C++ client SDKs (zip), the deploy files and `SHA256SUMS`. Tags with a suffix (`v1.3.0-rc1`) are marked as pre-releases.
+- The first time, set both packages to public in the GitHub package settings, otherwise the server needs `docker login ghcr.io` to pull them.
 
 See [`deploy/README.md`](deploy/README.md) for the full walkthrough, configuration, and security notes.
 
@@ -66,9 +73,25 @@ Two OpenAPI specifications live under `backend/src/main/resources/openapi/`:
 
 Both share a common error schema (`common/error.yaml`, RFC 7807 structured errors).
 
+Client SDKs for Kotlin and C++ are generated from `app-api.yaml` — see [`sdk/README.md`](sdk/README.md).
+
 ## Configuration
 
 The backend is configured entirely through environment variables — see [`deploy/.env.example`](deploy/.env.example) for the full list (database credentials, JWT secret, admin bootstrap account, admin panel CORS origin, audit log retention).
+
+Both services send `Content-Security-Policy`, `X-Content-Type-Options` and `Referrer-Policy` headers. The app works over plain HTTP by default; set `FORCE_HTTPS=true` once it is served over HTTPS to additionally send `Strict-Transport-Security` and mark session cookies `Secure`.
+
+## Two-factor authentication
+
+Every admin can enable TOTP on the *My account* page: scan the QR code, confirm with a code, store the backup codes. Verification is local (HMAC over the shared secret and the clock), so neither the server nor the phone needs internet access, only a reasonably accurate clock on both. The issuer shown in the authenticator app defaults to `Stapik Cloud` and can be changed with `STAPIK_CLOUD_SECURITY_TOTP_ISSUER`.
+
+A locked-out admin can be reset by an `OWNER` on the *Administrators* page. If no owner can sign in, run the backend once with the CLI option, which resets the account and exits:
+
+```bash
+java -jar stapik-cloud.jar --reset-two-factor=<username> --spring.main.web-application-type=none
+```
+
+Resetting clears the secret and backup codes and signs the account out everywhere.
 
 ## TODO
 

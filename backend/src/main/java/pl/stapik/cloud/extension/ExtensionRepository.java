@@ -8,4 +8,5 @@ import java.util.UUID;
 @Repository
 public interface ExtensionRepository extends JpaRepository<ExtensionData, UUID> {
     boolean existsBySlug(String slug);
+    boolean existsByIdAndEnabledTrue(UUID id);
 }

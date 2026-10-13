@@ -12,9 +12,10 @@ import pl.stapik.cloud.apikey.data.ApiKeyData;
 import pl.stapik.cloud.apikey.data.ApiKeyScope;
 import pl.stapik.cloud.apikey.dto.CreateApiKeyInfo;
 import pl.stapik.cloud.apikey.dto.CreatedApiKey;
-import pl.stapik.cloud.common.crypto.HashingService;
+import pl.stapik.cloud.common.crypto.ApiKeyHasher;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
@@ -39,7 +40,10 @@ class ApiKeyServiceImplTest {
     private ApiKeyGenerator apiKeyGenerator;
 
     @Mock
-    private HashingService hashingService;
+    private ApiKeyHasher apiKeyHasher;
+
+    @Spy
+    private ApiKeyProperties apiKeyProperties = new ApiKeyProperties(Duration.ofDays(365), Duration.ofDays(30));
 
     @Spy
     private Clock clock = Clock.fixed(Instant.parse("2026-07-26T22:45:00Z"), ZoneId.of("UTC"));
@@ -72,7 +76,7 @@ class ApiKeyServiceImplTest {
         String prefix = "pre";
 
         given(apiKeyGenerator.generate()).willReturn(new ApiKeyGenerator.GeneratedKey(rawKey, prefix));
-        given(hashingService.hash(anyString())).willReturn(hashedKey);
+        given(apiKeyHasher.hash(anyString())).willReturn(hashedKey);
 
         ApiKeyData savedKey = ApiKeyData.builder().id(UUID.randomUUID()).build();
         given(apiKeyRepository.save(any(ApiKeyData.class))).willReturn(savedKey);
@@ -96,6 +100,28 @@ class ApiKeyServiceImplTest {
         assertThat(captor.getValue().getHashedKey()).isEqualTo(hashedKey);
         assertThat(captor.getValue().isRevoked()).isFalse();
         assertThat(captor.getValue().getCreatedAt()).isEqualTo("2026-07-26T22:45:00Z");
+    }
+
+    @Test
+    void shouldApplyDefaultValidityWhenExpirationNotProvided() {
+        // given
+        given(apiKeyGenerator.generate()).willReturn(new ApiKeyGenerator.GeneratedKey("raw-secret-key", "pre"));
+        given(apiKeyHasher.hash(anyString())).willReturn("hashed-secret-key");
+        given(apiKeyRepository.save(any(ApiKeyData.class))).willReturn(new ApiKeyData());
+
+        CreateApiKeyInfo createApiKeyInfo = CreateApiKeyInfo.builder()
+                .extensionId(UUID.randomUUID())
+                .label("my-key")
+                .scope(ApiKeyScope.READ_ONLY)
+                .build();
+
+        // when
+        apiKeyService.create(createApiKeyInfo);
+
+        // then
+        ArgumentCaptor<ApiKeyData> captor = ArgumentCaptor.forClass(ApiKeyData.class);
+        verify(apiKeyRepository).save(captor.capture());
+        assertThat(captor.getValue().getExpiresAt()).isEqualTo("2027-07-26T22:45:00Z");
     }
 
     @Test

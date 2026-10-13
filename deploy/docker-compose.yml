@@ -1,16 +1,24 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: ${CONTAINER_LOG_MAX_SIZE:-10m}
+    max-file: ${CONTAINER_LOG_MAX_FILES:-3}
+
 services:
   postgres:
     image: postgres:16-alpine
     container_name: stapik-cloud-postgres
     restart: unless-stopped
+    mem_limit: ${POSTGRES_MEM_LIMIT:-512m}
+    logging: *default-logging
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-stapik_cloud}
       POSTGRES_USER: ${POSTGRES_USER:-stapik}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
     volumes:
       - postgres-data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+    expose:
+      - "5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-stapik}"]
       interval: 5s
@@ -18,11 +26,14 @@ services:
       retries: 10
 
   app:
+    image: ${STAPIK_REGISTRY:-ghcr.io/stapik-group}/stapik-cloud-backend:${STAPIK_VERSION:-local}
     build:
       context: ../backend
       dockerfile: Dockerfile
     container_name: stapik-cloud-app
     restart: unless-stopped
+    mem_limit: ${APP_MEM_LIMIT:-1g}
+    logging: *default-logging
     depends_on:
       postgres:
         condition: service_healthy
@@ -36,15 +47,26 @@ services:
       ADMIN_ALLOWED_ORIGINS: ${ADMIN_ALLOWED_ORIGINS:-http://localhost:5173}
       ADMIN_BOOTSTRAP_USERNAME: ${ADMIN_BOOTSTRAP_USERNAME:-}
       ADMIN_BOOTSTRAP_PASSWORD: ${ADMIN_BOOTSTRAP_PASSWORD:-}
+      ENCRYPTION_KEYS: ${ENCRYPTION_KEYS:?ENCRYPTION_KEYS is required}
+      ENCRYPTION_ACTIVE_KEY_ID: ${ENCRYPTION_ACTIVE_KEY_ID:-1}
       ASSET_STORAGE_ROOT: /data/assets
       AUDIT_RETENTION_DAYS: ${AUDIT_RETENTION_DAYS:-365}
+      FORCE_HTTPS: ${FORCE_HTTPS:-false}
+      LOG_TOTAL_SIZE_CAP: ${LOG_TOTAL_SIZE_CAP:-512MB}
     volumes:
       - asset-storage:/data/assets
-      - /opt/stapik-cloud/logs:/app/logs
+      - app-logs:/app/logs
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/actuator/health/readiness > /dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
 
   admin:
+    image: ${STAPIK_REGISTRY:-ghcr.io/stapik-group}/stapik-cloud-admin:${STAPIK_VERSION:-local}
     build:
       context: ../admin
       dockerfile: Dockerfile
@@ -52,14 +74,26 @@ services:
         openapi: ../backend/src/main/resources/openapi
     container_name: stapik-cloud-admin
     restart: unless-stopped
+    mem_limit: ${ADMIN_MEM_LIMIT:-384m}
+    logging: *default-logging
     depends_on:
-      - app
+      app:
+        condition: service_healthy
     environment:
       STAPIK_CLOUD_API_URL: http://app:8080
-      COOKIE_SECURE: "false"
+      NODE_OPTIONS: --max-old-space-size=${ADMIN_NODE_HEAP_MB:-256}
+      FORCE_HTTPS: ${FORCE_HTTPS:-false}
+      COOKIE_SECURE: ${FORCE_HTTPS:-false}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/login > /dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     ports:
       - "3000:3000"
 
 volumes:
   postgres-data:
   asset-storage:
+  app-logs:

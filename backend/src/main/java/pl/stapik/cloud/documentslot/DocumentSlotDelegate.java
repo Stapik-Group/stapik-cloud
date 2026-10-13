@@ -47,6 +47,8 @@ public class DocumentSlotDelegate implements SlotsApiDelegate {
         boolean versioningEnabled = Optional.ofNullable(request.getVersioningEnabled()).orElse(DEFAULT_VERSIONING_ENABLED);
         int maxVersionsRetained = Optional.ofNullable(request.getMaxVersionsRetained()).orElse(DEFAULT_MAX_VERSIONS_RETAINED);
 
+        List<String> allowedMimeTypes = Optional.ofNullable(request.getAllowedMimeTypes()).orElse(List.of());
+
         ConflictStrategy conflictStrategy = Optional.ofNullable(request.getConflictStrategy()).isPresent() ?
                 ConflictStrategy.valueOf(request.getConflictStrategy().getValue()) :
                 DEFAULT_CONFLICT_STRATEGY;
@@ -57,7 +59,8 @@ public class DocumentSlotDelegate implements SlotsApiDelegate {
                 maxSizeBytes,
                 versioningEnabled,
                 maxVersionsRetained,
-                conflictStrategy
+                conflictStrategy,
+                allowedMimeTypes
         );
 
         return ResponseEntity.status(HttpStatus.CREATED).body(documentSlotMapper.toResponse(created));

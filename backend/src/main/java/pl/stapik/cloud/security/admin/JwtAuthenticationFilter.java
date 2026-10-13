@@ -10,6 +10,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
+import pl.stapik.cloud.admin.AdminSessionService;
 
 import java.io.IOException;
 import java.util.List;
@@ -21,6 +22,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final String PREFIX = "Bearer ";
 
     private final JwtService jwtService;
+    private final AdminSessionService adminSessionService;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, @NonNull HttpServletResponse response, @NonNull FilterChain filterChain)
@@ -29,7 +31,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String header = request.getHeader(HEADER_NAME);
         if (header != null && header.startsWith(PREFIX)) {
             String token = header.substring(PREFIX.length());
-            jwtService.validate(token).ifPresent(principal -> {
+            jwtService.validate(token).filter(this::isNotRevoked).ifPresent(principal -> {
                 List<SimpleGrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_" + principal.role()));
                 var authentication = new UsernamePasswordAuthenticationToken(principal, null, authorities);
                 SecurityContextHolder.getContext().setAuthentication(authentication);
@@ -37,5 +39,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private boolean isNotRevoked(JwtPrincipal principal) {
+        return principal.sessionId() == null || adminSessionService.isActive(principal.sessionId());
     }
 }

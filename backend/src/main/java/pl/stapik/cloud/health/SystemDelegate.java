@@ -9,12 +9,9 @@ import org.springframework.stereotype.Component;
 import pl.stapik.cloud.extension.ExtensionData;
 import pl.stapik.cloud.extension.ExtensionRepository;
 import pl.stapik.cloud.internal.api.SystemApiDelegate;
-import pl.stapik.cloud.internal.data.HealthResponse;
 import pl.stapik.cloud.internal.data.MeResponse;
 import pl.stapik.cloud.security.apikey.ApiKeyPrincipal;
 
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 
@@ -23,15 +20,6 @@ import java.util.Optional;
 public class SystemDelegate implements SystemApiDelegate {
 
     private final ExtensionRepository extensionRepository;
-
-    @Override
-    public ResponseEntity<HealthResponse> getHealth() {
-        HealthResponse response = new HealthResponse()
-                .status("UP")
-                .timestamp(OffsetDateTime.now(ZoneOffset.UTC));
-
-        return ResponseEntity.ok(response);
-    }
 
     @Override
     public ResponseEntity<MeResponse> getMe() {

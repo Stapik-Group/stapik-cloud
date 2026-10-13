@@ -10,9 +10,11 @@ import org.springframework.test.web.servlet.MockMvc;
 import pl.stapik.cloud.AbstractIntegrationTest;
 
 import javax.sql.DataSource;
+import java.security.MessageDigest;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.time.Instant;
+import java.util.HexFormat;
 import java.util.UUID;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -65,10 +67,59 @@ class AssetDataDelegateTest extends AbstractIntegrationTest {
                         .with(req -> { req.setMethod("PUT"); return req; }))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.filename").value("report.pdf"))
-                .andExpect(jsonPath("$.mimeType").value("application/pdf"))
+                .andExpect(jsonPath("$.mimeType").value("text/plain"))
                 .andExpect(jsonPath("$.sizeBytes").value("hello world".getBytes().length))
                 .andExpect(jsonPath("$.checksumSha256").isNotEmpty())
                 .andExpect(jsonPath("$.updatedAt").isNotEmpty());
+    }
+
+    @Test
+    void shouldAcceptUploadWhenChecksumHeaderMatches() throws Exception {
+        // given
+        insertSlot(extensionId, "files", 1_048_576L);
+        byte[] content = "hello world".getBytes();
+        MockMultipartFile file = new MockMultipartFile("file", "report.txt", "text/plain", content);
+
+        // when & then
+        mockMvc.perform(multipart("/api/v1/assets/{slotKey}/{filename}", "files", "report.txt")
+                        .file(file)
+                        .header(API_KEY_HEADER, rawApiKey)
+                        .header("X-Checksum-Sha256", sha256Hex(content))
+                        .with(req -> { req.setMethod("PUT"); return req; }))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.checksumSha256").value(sha256Hex(content)));
+    }
+
+    @Test
+    void shouldRejectUploadWhenChecksumHeaderDoesNotMatch() throws Exception {
+        // given
+        insertSlot(extensionId, "files", 1_048_576L);
+        MockMultipartFile file = new MockMultipartFile("file", "report.txt", "text/plain", "hello world".getBytes());
+
+        // when & then
+        mockMvc.perform(multipart("/api/v1/assets/{slotKey}/{filename}", "files", "report.txt")
+                        .file(file)
+                        .header(API_KEY_HEADER, rawApiKey)
+                        .header("X-Checksum-Sha256", sha256Hex("different".getBytes()))
+                        .with(req -> { req.setMethod("PUT"); return req; }))
+                .andExpect(status().isUnprocessableContent());
+
+        mockMvc.perform(get("/api/v1/assets/{slotKey}", "files").header(API_KEY_HEADER, rawApiKey))
+                .andExpect(jsonPath("$.assets.length()").value(0));
+    }
+
+    @Test
+    void shouldRejectReservedFilename() throws Exception {
+        // given
+        insertSlot(extensionId, "files", 1_048_576L);
+        MockMultipartFile file = new MockMultipartFile("file", "CON.txt", "text/plain", "hello".getBytes());
+
+        // when & then
+        mockMvc.perform(multipart("/api/v1/assets/{slotKey}/{filename}", "files", "CON.txt")
+                        .file(file)
+                        .header(API_KEY_HEADER, rawApiKey)
+                        .with(req -> { req.setMethod("PUT"); return req; }))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -231,5 +282,9 @@ class AssetDataDelegateTest extends AbstractIntegrationTest {
                 ps.executeUpdate();
             }
         }
+    }
+
+    private static String sha256Hex(byte[] content) throws Exception {
+        return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(content));
     }
 }

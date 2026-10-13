@@ -1,7 +1,10 @@
-import { API_BASE_URL } from "@/lib/api-client";
+import { API_BASE_URL, AUTH_COOKIE_NAME, REFRESH_COOKIE_NAME } from "@/lib/api-client";
 import type { components } from "@/lib/api-types";
 
 export type LoginTokens = components["schemas"]["LoginResponse"];
+export type LoginResult = components["schemas"]["LoginResult"];
+
+type CookieWriter = { set(name: string, value: string, options: ReturnType<typeof sessionCookieOptions>): unknown };
 
 export type RefreshResult =
     | { status: "refreshed"; tokens: LoginTokens }
@@ -20,6 +23,11 @@ export function sessionCookieOptions(expiresAt: string) {
     };
 }
 
+export function setSessionCookies(cookieStore: CookieWriter, tokens: LoginTokens) {
+    cookieStore.set(AUTH_COOKIE_NAME, tokens.token, sessionCookieOptions(tokens.expiresAt));
+    cookieStore.set(REFRESH_COOKIE_NAME, tokens.refreshToken, sessionCookieOptions(tokens.refreshExpiresAt));
+}
+
 // Reads the "exp" claim only as a hint to refresh slightly early. The signature is verified by the backend.
 export function isAccessTokenExpiring(accessToken: string): boolean {
     try {
@@ -36,11 +44,14 @@ export function isAccessTokenExpiring(accessToken: string): boolean {
     }
 }
 
-export async function exchangeRefreshToken(refreshToken: string): Promise<RefreshResult> {
+export async function exchangeRefreshToken(
+    refreshToken: string,
+    clientHeaders: Record<string, string> = {},
+): Promise<RefreshResult> {
     try {
         const response = await fetch(`${API_BASE_URL}/api/admin/auth/refresh`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", ...clientHeaders },
             body: JSON.stringify({ refreshToken }),
         });
 

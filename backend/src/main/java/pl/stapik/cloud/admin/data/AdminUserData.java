@@ -3,6 +3,8 @@ package pl.stapik.cloud.admin.data;
 import jakarta.persistence.*;
 import lombok.*;
 
+import pl.stapik.cloud.common.crypto.EncryptedContentConverter;
+
 import java.time.Instant;
 import java.util.UUID;
 
@@ -24,8 +26,15 @@ public class AdminUserData {
     @Column(name = "password_hash", nullable = false)
     private String passwordHash;
 
+    @Convert(converter = EncryptedContentConverter.class)
     @Column(name = "totp_secret")
     private String totpSecret;
+
+    @Column(name = "totp_enabled", nullable = false)
+    private boolean totpEnabled;
+
+    @Column(name = "totp_last_used_step")
+    private Long totpLastUsedStep;
 
     @Column(nullable = false)
     private String role;

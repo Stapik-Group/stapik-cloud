@@ -15,6 +15,13 @@ const CONFLICT_STRATEGIES: ConflictStrategy[] = [
     "LAST_WRITE_WINS_WITH_SHADOW_COPY",
 ];
 
+function parseMimeTypes(input: string): string[] {
+    return input
+        .split(",")
+        .map((mimeType) => mimeType.trim().toLowerCase())
+        .filter(Boolean);
+}
+
 export function CreateSlotForm({ extensionId }: { extensionId: string }) {
     const router = useRouter();
     const { t } = useTranslation();
@@ -23,6 +30,7 @@ export function CreateSlotForm({ extensionId }: { extensionId: string }) {
     const [versioningEnabled, setVersioningEnabled] = useState(true);
     const [maxVersionsRetained, setMaxVersionsRetained] = useState(20);
     const [conflictStrategy, setConflictStrategy] = useState<ConflictStrategy | "">("");
+    const [allowedMimeTypes, setAllowedMimeTypes] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -36,6 +44,7 @@ export function CreateSlotForm({ extensionId }: { extensionId: string }) {
             contentType,
             versioningEnabled,
             maxVersionsRetained,
+            allowedMimeTypes: parseMimeTypes(allowedMimeTypes),
             ...(conflictStrategy ? { conflictStrategy } : {}),
         };
 
@@ -128,6 +137,20 @@ export function CreateSlotForm({ extensionId }: { extensionId: string }) {
                         value={maxVersionsRetained}
                         onChange={(e) => setMaxVersionsRetained(Number(e.target.value))}
                         className="input w-full"
+                    />
+                </div>
+
+                <div className="space-y-1 sm:col-span-2">
+                    <label htmlFor="allowedMimeTypes" className="text-sm text-text-muted">
+                        {t("slots.allowedMimeTypes")}
+                    </label>
+                    <input
+                        id="allowedMimeTypes"
+                        type="text"
+                        value={allowedMimeTypes}
+                        onChange={(e) => setAllowedMimeTypes(e.target.value)}
+                        className="input w-full"
+                        placeholder="image/*, application/pdf"
                     />
                 </div>
             </div>

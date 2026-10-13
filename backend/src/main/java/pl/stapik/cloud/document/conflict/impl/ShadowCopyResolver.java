@@ -5,8 +5,6 @@ import pl.stapik.cloud.document.conflict.ConflictDecision;
 import pl.stapik.cloud.document.conflict.ConflictResolver;
 import pl.stapik.cloud.documentslot.data.ConflictStrategy;
 
-import java.time.Instant;
-
 @Component
 public class ShadowCopyResolver implements ConflictResolver {
 
@@ -16,8 +14,8 @@ public class ShadowCopyResolver implements ConflictResolver {
     }
 
     @Override
-    public ConflictDecision resolve(Instant existingUpdatedAt, Instant clientLastKnownUpdate) {
-        boolean clientWasUpToDate = clientLastKnownUpdate != null && !clientLastKnownUpdate.isBefore(existingUpdatedAt);
+    public ConflictDecision resolve(String existingContentHash, String clientContentHash) {
+        boolean clientWasUpToDate = existingContentHash.equals(clientContentHash);
         return clientWasUpToDate ? ConflictDecision.accept() : new ConflictDecision(false, true);
     }
 }

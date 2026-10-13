@@ -8,7 +8,13 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
+import pl.stapik.cloud.admin.AdminUserStateException;
+import pl.stapik.cloud.admin.PasswordVerificationException;
+import pl.stapik.cloud.admin.TwoFactorStateException;
+import pl.stapik.cloud.admin.TwoFactorVerificationException;
+import pl.stapik.cloud.security.ratelimit.TooManyRequestsException;
 
 import java.net.URI;
 import java.util.NoSuchElementException;
@@ -22,6 +28,27 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         problemDetail.setTitle("Unauthorized");
         problemDetail.setType(URI.create("urn:error:auth:unauthorized"));
         return problemDetail;
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ProblemDetail handleAccessDeniedException(AccessDeniedException ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+        problemDetail.setTitle("Forbidden");
+        problemDetail.setType(URI.create("urn:error:auth:forbidden"));
+        return problemDetail;
+    }
+
+    @ExceptionHandler(TooManyRequestsException.class)
+    public ResponseEntity<ProblemDetail> handleTooManyRequests(TooManyRequestsException ex) {
+        long retryAfterSeconds = ex.getRetryAfterSeconds();
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(
+                HttpStatus.TOO_MANY_REQUESTS, "%s. Retry after %d seconds.".formatted(ex.getMessage(), retryAfterSeconds));
+        problemDetail.setTitle("Too many requests");
+        problemDetail.setType(URI.create("urn:error:rate-limit:too-many-requests"));
+        problemDetail.setProperty("retryAfterSeconds", retryAfterSeconds);
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(retryAfterSeconds))
+                .body(problemDetail);
     }
 
     @ExceptionHandler(NoSuchElementException.class)
@@ -38,6 +65,38 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         problem.setTitle("Duplicate resource");
         problem.setProperty("constraint", ex.getConstraintName());
         problem.setType(URI.create("urn:error:duplicate-resource"));
+        return problem;
+    }
+
+    @ExceptionHandler(TwoFactorVerificationException.class)
+    public ProblemDetail handleTwoFactorVerification(TwoFactorVerificationException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        problem.setTitle("Verification failed");
+        problem.setType(URI.create("urn:error:auth:two-factor-verification"));
+        return problem;
+    }
+
+    @ExceptionHandler(AdminUserStateException.class)
+    public ProblemDetail handleAdminUserState(AdminUserStateException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        problem.setTitle("Admin user state conflict");
+        problem.setType(URI.create("urn:error:admin-user:state"));
+        return problem;
+    }
+
+    @ExceptionHandler(PasswordVerificationException.class)
+    public ProblemDetail handlePasswordVerification(PasswordVerificationException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        problem.setTitle("Verification failed");
+        problem.setType(URI.create("urn:error:auth:password-verification"));
+        return problem;
+    }
+
+    @ExceptionHandler(TwoFactorStateException.class)
+    public ProblemDetail handleTwoFactorState(TwoFactorStateException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        problem.setTitle("Two-factor state conflict");
+        problem.setType(URI.create("urn:error:auth:two-factor-state"));
         return problem;
     }
 
