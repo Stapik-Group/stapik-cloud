@@ -69,10 +69,10 @@ class AdminAuthDelegateTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.token").isNotEmpty())
-                .andExpect(jsonPath("$.expiresAt").isNotEmpty())
-                .andExpect(jsonPath("$.refreshToken").isNotEmpty())
-                .andExpect(jsonPath("$.refreshExpiresAt").isNotEmpty());
+                .andExpect(jsonPath("$.session.token").isNotEmpty())
+                .andExpect(jsonPath("$.session.expiresAt").isNotEmpty())
+                .andExpect(jsonPath("$.session.refreshToken").isNotEmpty())
+                .andExpect(jsonPath("$.session.refreshExpiresAt").isNotEmpty());
     }
 
     @Test
@@ -202,7 +202,7 @@ class AdminAuthDelegateTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn();
 
-        return JsonPath.read(result.getResponse().getContentAsString(), "$.refreshToken");
+        return JsonPath.read(result.getResponse().getContentAsString(), "$.session.refreshToken");
     }
 
     private String refreshPayload(String refreshToken) {

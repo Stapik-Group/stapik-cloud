@@ -51,6 +51,19 @@ class LoginRateLimitFilterTest {
     }
 
     @Test
+    void shouldShareTheLimitWithTwoFactorLogin() throws Exception {
+        LoginRateLimitFilter filter = new LoginRateLimitFilter(new KeyedRateLimiter(1), exceptionResolver);
+        MockHttpServletRequest twoFactorRequest = new MockHttpServletRequest("POST", "/api/admin/auth/login/two-factor");
+        twoFactorRequest.setRemoteAddr("10.0.0.1");
+
+        filter.doFilter(twoFactorRequest, new MockHttpServletResponse(), filterChain);
+        filter.doFilter(twoFactorRequest, new MockHttpServletResponse(), filterChain);
+
+        verify(filterChain, times(1)).doFilter(any(), any());
+        verify(exceptionResolver).resolveException(any(), any(), isNull(), any(TooManyRequestsException.class));
+    }
+
+    @Test
     void shouldNotLimitOtherEndpoints() throws Exception {
         LoginRateLimitFilter filter = new LoginRateLimitFilter(new KeyedRateLimiter(1), exceptionResolver);
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/admin/extensions");

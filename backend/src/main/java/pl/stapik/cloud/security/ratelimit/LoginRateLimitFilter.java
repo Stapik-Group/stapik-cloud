@@ -11,18 +11,19 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 
 import java.io.IOException;
+import java.util.Set;
 
 @RequiredArgsConstructor
 public class LoginRateLimitFilter extends OncePerRequestFilter {
 
-    private static final String LOGIN_URI = "/api/admin/auth/login";
+    private static final Set<String> RATE_LIMITED_URIS = Set.of("/api/admin/auth/login", "/api/admin/auth/login/two-factor");
 
     private final KeyedRateLimiter ipRateLimiter;
     private final HandlerExceptionResolver exceptionResolver;
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !HttpMethod.POST.matches(request.getMethod()) || !LOGIN_URI.equals(request.getRequestURI());
+        return !HttpMethod.POST.matches(request.getMethod()) || !RATE_LIMITED_URIS.contains(request.getRequestURI());
     }
 
     @Override

@@ -227,8 +227,8 @@ class SecurityE2ETest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.token").isNotEmpty())
-                .andExpect(jsonPath("$.expiresAt").isNotEmpty());
+                .andExpect(jsonPath("$.session.token").isNotEmpty())
+                .andExpect(jsonPath("$.session.expiresAt").isNotEmpty());
     }
 
     @Test
@@ -325,7 +325,7 @@ class SecurityE2ETest extends AbstractIntegrationTest {
                 .getResponse()
                 .getContentAsString();
 
-        String token = JsonPath.read(loginResponse, "$.token");
+        String token = JsonPath.read(loginResponse, "$.session.token");
 
         mockMvc.perform(get("/api/admin/extensions")
                         .header("Authorization", "Bearer " + token))

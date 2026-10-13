@@ -9,6 +9,8 @@ import pl.stapik.cloud.admin.RefreshTokenRepository;
 import pl.stapik.cloud.admin.data.AdminUserData;
 import pl.stapik.cloud.admin.data.RefreshTokenData;
 import pl.stapik.cloud.admin.dto.AdminSession;
+import pl.stapik.cloud.audit.Auditing;
+import pl.stapik.cloud.audit.data.AuditAction;
 import pl.stapik.cloud.security.admin.JwtService;
 
 import java.nio.charset.StandardCharsets;
@@ -48,6 +50,7 @@ public class AdminSessionServiceImpl implements AdminSessionService {
     }
 
     @Transactional
+    @Auditing(action = AuditAction.ADMIN_LOGIN_SUCCEEDED, actor = "#adminUser.username")
     @Override
     public AdminSession startSession(AdminUserData adminUser) {
         Instant now = Instant.now();
