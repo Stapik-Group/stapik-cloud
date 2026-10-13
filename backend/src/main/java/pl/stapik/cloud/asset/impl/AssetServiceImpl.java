@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import pl.stapik.cloud.asset.AssetMimeTypePolicy;
 import pl.stapik.cloud.asset.AssetRepository;
 import pl.stapik.cloud.asset.AssetService;
 import pl.stapik.cloud.asset.AssetTooLargeException;
@@ -13,7 +14,9 @@ import pl.stapik.cloud.asset.storage.AssetStorage;
 import pl.stapik.cloud.documentslot.data.DocumentSlotData;
 import pl.stapik.cloud.documentslot.DocumentSlotRepository;
 
+import java.io.BufferedInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.time.Instant;
 import java.util.List;
@@ -29,6 +32,7 @@ public class AssetServiceImpl implements AssetService {
     private final AssetRepository assetRepository;
     private final DocumentSlotRepository documentSlotRepository;
     private final AssetStorage assetStorage;
+    private final AssetMimeTypePolicy assetMimeTypePolicy;
 
     @Override
     public List<AssetData> list(AssetIdentifier identifier) {
@@ -37,7 +41,7 @@ public class AssetServiceImpl implements AssetService {
     }
 
     @Override
-    public AssetData upload(AssetIdentifier identifier, MultipartFile file) {
+    public AssetData upload(AssetIdentifier identifier, MultipartFile file, String expectedChecksumSha256) {
         DocumentSlotData slot = requireSlot(identifier.getExtensionId(), identifier.getSlotKey());
 
         if (file.getSize() > slot.getMaxSizeBytes()) {
@@ -45,8 +49,9 @@ public class AssetServiceImpl implements AssetService {
         }
 
         try {
-            AssetStorage.StoredAsset stored = assetStorage.store(identifier.getExtensionId(), slot.getId(), identifier.getFilename(), file);
-            return saveStoredAsset(slot, identifier.getFilename(), file.getContentType(), stored);
+            String mimeType = resolveMimeType(slot, identifier.getFilename(), file);
+            AssetStorage.StoredAsset stored = assetStorage.store(identifier.getExtensionId(), slot.getId(), identifier.getFilename(), file, expectedChecksumSha256);
+            return saveStoredAsset(slot, identifier.getFilename(), mimeType, stored);
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to store asset: " + identifier.getFilename(), e);
         }
@@ -89,6 +94,12 @@ public class AssetServiceImpl implements AssetService {
             throw new UncheckedIOException("Failed to delete asset file: " + identifier.getFilename(), e);
         }
         assetRepository.delete(assetData);
+    }
+
+    private String resolveMimeType(DocumentSlotData slot, String filename, MultipartFile file) throws IOException {
+        try (InputStream content = new BufferedInputStream(file.getInputStream())) {
+            return assetMimeTypePolicy.resolve(slot, filename, content);
+        }
     }
 
     private AssetData requireAsset(AssetIdentifier identifier) {

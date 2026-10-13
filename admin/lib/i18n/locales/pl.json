@@ -58,6 +58,7 @@
   "slots.conflictStrategy": "Strategia konfliktu (domyślna: shadow copy)",
   "slots.default": "domyślna",
   "slots.maxVersionsRetained": "Max wersji w historii",
+  "slots.allowedMimeTypes": "Dozwolone typy plików (po przecinku, puste = dowolne)",
   "slots.versioning": "Wersjonowanie",
   "slots.submit": "Dodaj slot",
   "slots.submitting": "Dodawanie...",

@@ -116,13 +116,39 @@ class FilesystemAssetStorageUploadTest {
         MockMultipartFile file = new MockMultipartFile("file", FILENAME, "text/plain", "plain text".getBytes(StandardCharsets.UTF_8));
 
         // when
-        AssetStorage.StoredAsset stored = storage.store(EXTENSION_ID, SLOT_ID, FILENAME, file);
+        AssetStorage.StoredAsset stored = storage.store(EXTENSION_ID, SLOT_ID, FILENAME, file, null);
 
         // then
         assertThat(stored.sizeBytes()).isEqualTo(10);
         assertThat(stored.checksumSha256()).isEqualTo(sha256("plain text"));
         assertThat(new String(Files.readAllBytes(root.resolve(stored.storagePath())), StandardCharsets.ISO_8859_1)).doesNotContain("plain text");
         assertThat(read(stored)).isEqualTo("plain text");
+    }
+
+    @Test
+    void shouldStoreMultipartFileWhenExpectedChecksumMatches() throws Exception {
+        // given
+        MockMultipartFile file = new MockMultipartFile("file", FILENAME, "text/plain", "plain text".getBytes(StandardCharsets.UTF_8));
+
+        // when
+        AssetStorage.StoredAsset stored = storage.store(EXTENSION_ID, SLOT_ID, FILENAME, file, sha256("plain text").toUpperCase());
+
+        // then
+        assertThat(read(stored)).isEqualTo("plain text");
+    }
+
+    @Test
+    void shouldKeepPreviousFileWhenMultipartChecksumDoesNotMatch() throws Exception {
+        // given
+        AssetStorage.StoredAsset previous = storage.store(EXTENSION_ID, SLOT_ID, FILENAME,
+                new MockMultipartFile("file", FILENAME, "text/plain", "old".getBytes(StandardCharsets.UTF_8)), null);
+        MockMultipartFile replacement = new MockMultipartFile("file", FILENAME, "text/plain", "new".getBytes(StandardCharsets.UTF_8));
+
+        // when / then
+        assertThatThrownBy(() -> storage.store(EXTENSION_ID, SLOT_ID, FILENAME, replacement, sha256("other")))
+                .isInstanceOf(AssetChecksumMismatchException.class);
+        assertThat(read(previous)).isEqualTo("old");
+        assertThat(root.resolve(".uploads")).isEmptyDirectory();
     }
 
     @Test

@@ -37,7 +37,8 @@ public class DocumentSlotServiceImpl implements DocumentSlotService {
             long maxSizeBytes,
             boolean versioningEnabled,
             int maxVersionsRetained,
-            ConflictStrategy conflictStrategy
+            ConflictStrategy conflictStrategy,
+            List<String> allowedMimeTypes
     ) {
         if (!extensionRepository.existsById(documentIdentifier.getExtensionId())) {
             throw new NoSuchElementException("Extension not found: " + documentIdentifier.getExtensionId());
@@ -51,6 +52,7 @@ public class DocumentSlotServiceImpl implements DocumentSlotService {
                 .versioningEnabled(versioningEnabled)
                 .maxVersionsRetained(maxVersionsRetained)
                 .conflictStrategy(conflictStrategy)
+                .allowedMimeTypes(allowedMimeTypes)
                 .createdAt(Instant.now())
                 .build();
 

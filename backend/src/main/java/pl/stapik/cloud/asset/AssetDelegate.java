@@ -2,6 +2,8 @@ package pl.stapik.cloud.asset;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.Resource;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -18,6 +20,7 @@ import pl.stapik.cloud.internal.data.AssetListResponse;
 import pl.stapik.cloud.internal.data.AssetMetadataResponse;
 import pl.stapik.cloud.security.apikey.ApiKeyPrincipal;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -39,8 +42,8 @@ public class AssetDelegate implements AssetsApiDelegate {
     }
 
     @Override
-    public ResponseEntity<AssetMetadataResponse> uploadAsset(String slotKey, String filename, MultipartFile file) {
-        AssetData assetData = assetServiceImpl.upload(AssetIdentifier.of(currentExtensionId(), slotKey, filename), file);
+    public ResponseEntity<AssetMetadataResponse> uploadAsset(String slotKey, String filename, MultipartFile file, String xChecksumSha256) {
+        AssetData assetData = assetServiceImpl.upload(AssetIdentifier.of(currentExtensionId(), slotKey, filename), file, xChecksumSha256);
         return ResponseEntity.ok(assetMapper.toResponse(assetData));
     }
 
@@ -48,6 +51,7 @@ public class AssetDelegate implements AssetsApiDelegate {
     public ResponseEntity<Resource> downloadAsset(String slotKey, String filename) {
         Resource resource = assetServiceImpl.download(AssetIdentifier.of(currentExtensionId(), slotKey, filename));
         return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(filename, StandardCharsets.UTF_8).build().toString())
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .body(resource);
     }

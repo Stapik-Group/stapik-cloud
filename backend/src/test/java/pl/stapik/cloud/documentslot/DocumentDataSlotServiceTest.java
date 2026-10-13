@@ -78,7 +78,8 @@ class DocumentDataSlotServiceTest {
                 1_048_576L,
                 true,
                 10,
-                ConflictStrategy.LAST_WRITE_WINS
+                ConflictStrategy.LAST_WRITE_WINS,
+                List.of()
         );
 
         // then
@@ -105,7 +106,8 @@ class DocumentDataSlotServiceTest {
                 1_048_576L,
                 true,
                 10,
-                ConflictStrategy.LAST_WRITE_WINS
+                ConflictStrategy.LAST_WRITE_WINS,
+                List.of()
         ))
                 .isInstanceOf(NoSuchElementException.class)
                 .hasMessageContaining(EXTENSION_ID.toString());

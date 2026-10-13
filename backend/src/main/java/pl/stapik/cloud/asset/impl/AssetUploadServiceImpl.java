@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pl.stapik.cloud.asset.AssetChecksumMismatchException;
+import pl.stapik.cloud.asset.AssetMimeTypePolicy;
 import pl.stapik.cloud.asset.AssetService;
 import pl.stapik.cloud.asset.AssetTooLargeException;
 import pl.stapik.cloud.asset.AssetUploadOffsetMismatchException;
@@ -18,6 +19,7 @@ import pl.stapik.cloud.asset.storage.AssetStorage;
 import pl.stapik.cloud.documentslot.DocumentSlotRepository;
 import pl.stapik.cloud.documentslot.data.DocumentSlotData;
 
+import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -39,6 +41,7 @@ public class AssetUploadServiceImpl implements AssetUploadService {
     private final DocumentSlotRepository documentSlotRepository;
     private final AssetService assetService;
     private final AssetStorage assetStorage;
+    private final AssetMimeTypePolicy assetMimeTypePolicy;
     private final AssetUploadProperties properties;
     private final Clock clock;
 
@@ -91,11 +94,13 @@ public class AssetUploadServiceImpl implements AssetUploadService {
             throw new AssetUploadOffsetMismatchException(upload.getReceivedBytes(), offset);
         }
 
+        InputStream content = offset == 0 ? resolveMimeTypeFromFirstChunk(context, chunk) : chunk;
+
         long remainingBytes = upload.getSizeBytes() - upload.getReceivedBytes();
         long maxChunkBytes = Math.min(remainingBytes, properties.maxChunkSize().toBytes());
 
         try {
-            long writtenBytes = assetStorage.appendChunk(uploadId, offset, chunk, maxChunkBytes);
+            long writtenBytes = assetStorage.appendChunk(uploadId, offset, content, maxChunkBytes);
             upload.setReceivedBytes(offset + writtenBytes);
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to append chunk to upload: " + uploadId, e);
@@ -111,6 +116,17 @@ public class AssetUploadServiceImpl implements AssetUploadService {
         }
 
         return AssetUploadResult.completed(upload, complete(context));
+    }
+
+    private InputStream resolveMimeTypeFromFirstChunk(UploadContext context, InputStream chunk) {
+        AssetUploadData upload = context.upload();
+        InputStream content = new BufferedInputStream(chunk);
+        try {
+            upload.setMimeType(assetMimeTypePolicy.resolve(context.slot(), upload.getFilename(), content));
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to inspect upload: " + upload.getId(), e);
+        }
+        return content;
     }
 
     @Transactional

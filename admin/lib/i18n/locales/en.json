@@ -58,6 +58,7 @@
   "slots.conflictStrategy": "Conflict strategy (default: shadow copy)",
   "slots.default": "default",
   "slots.maxVersionsRetained": "Max retained versions",
+  "slots.allowedMimeTypes": "Allowed file types (comma-separated, empty = any)",
   "slots.versioning": "Versioning",
   "slots.submit": "Add slot",
   "slots.submitting": "Adding...",

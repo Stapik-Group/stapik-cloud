@@ -420,6 +420,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/SlotKeyParam'
         - $ref: '#/components/parameters/FilenameParam'
+        - $ref: '#/components/parameters/ChecksumSha256Header'
       requestBody:
         required: true
         content:
@@ -446,6 +447,12 @@ paths:
                 $ref: 'common/error.yaml#/components/schemas/Problem'
         '413':
           description: Maximum file size for this slot exceeded
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+        '422':
+          description: Checksum of the received content does not match X-Checksum-Sha256; the previous file is left untouched
           content:
             application/json:
               schema:
@@ -665,6 +672,14 @@ components:
       required: true
       schema:
         type: string
+    ChecksumSha256Header:
+      name: X-Checksum-Sha256
+      in: header
+      required: false
+      description: SHA-256 of the uploaded file; the upload is rejected when it differs from the checksum computed by the server.
+      schema:
+        type: string
+        pattern: '^[0-9a-fA-F]{64}$'
     UploadIdParam:
       name: uploadId
       in: path

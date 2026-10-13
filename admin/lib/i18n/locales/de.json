@@ -58,6 +58,7 @@
   "slots.conflictStrategy": "Konfliktstrategie (Standard: Shadow Copy)",
   "slots.default": "Standard",
   "slots.maxVersionsRetained": "Max. gespeicherte Versionen",
+  "slots.allowedMimeTypes": "Erlaubte Dateitypen (kommagetrennt, leer = beliebig)",
   "slots.versioning": "Versionierung",
   "slots.submit": "Slot hinzufügen",
   "slots.submitting": "Wird hinzugefügt...",

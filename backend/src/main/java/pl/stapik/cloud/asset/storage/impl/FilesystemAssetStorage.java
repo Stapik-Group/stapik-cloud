@@ -38,23 +38,31 @@ public class FilesystemAssetStorage implements AssetStorage {
     }
 
     @Override
-    public StoredAsset store(UUID extensionId, UUID slotId, String filename, MultipartFile file) throws IOException {
+    public StoredAsset store(UUID extensionId, UUID slotId, String filename, MultipartFile file, String expectedChecksumSha256) throws IOException {
         Path targetFile = resolveTargetFile(extensionId, slotId, filename);
-        Files.createDirectories(targetFile.getParent());
+        Path stagingFile = rootPath.resolve(UPLOADS_DIRECTORY).resolve(UUID.randomUUID() + PART_FILE_SUFFIX);
+        Files.createDirectories(stagingFile.getParent());
 
         MessageDigest digest = newSha256Digest();
 
-        long sizeBytes;
-        try (DigestInputStream digestStream = new DigestInputStream(file.getInputStream(), digest);
-             AssetFileCipher.Appender appender = cipher.create(
-                     targetFile, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE)) {
-            sizeBytes = appender.write(digestStream, Long.MAX_VALUE);
+        try {
+            long sizeBytes;
+            try (DigestInputStream digestStream = new DigestInputStream(file.getInputStream(), digest);
+                 AssetFileCipher.Appender appender = cipher.create(
+                         stagingFile, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)) {
+                sizeBytes = appender.write(digestStream, Long.MAX_VALUE);
+            }
+
+            String checksum = HexFormat.of().formatHex(digest.digest());
+            requireMatchingChecksum(expectedChecksumSha256, checksum);
+
+            Files.createDirectories(targetFile.getParent());
+            Files.move(stagingFile, targetFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+
+            return new StoredAsset(rootPath.relativize(targetFile).toString(), checksum, sizeBytes);
+        } finally {
+            Files.deleteIfExists(stagingFile);
         }
-
-        String checksum = HexFormat.of().formatHex(digest.digest());
-        String relativePath = rootPath.relativize(targetFile).toString();
-
-        return new StoredAsset(relativePath, checksum, sizeBytes);
     }
 
     @Override
@@ -97,9 +105,7 @@ public class FilesystemAssetStorage implements AssetStorage {
         Path targetFile = resolveTargetFile(extensionId, slotId, filename);
 
         Fingerprint fingerprint = fingerprintOf(partFile);
-        if (expectedChecksumSha256 != null && !expectedChecksumSha256.equalsIgnoreCase(fingerprint.checksumSha256())) {
-            throw new AssetChecksumMismatchException(expectedChecksumSha256, fingerprint.checksumSha256());
-        }
+        requireMatchingChecksum(expectedChecksumSha256, fingerprint.checksumSha256());
 
         Files.createDirectories(targetFile.getParent());
         Files.move(partFile, targetFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
@@ -119,6 +125,12 @@ public class FilesystemAssetStorage implements AssetStorage {
             throw new IOException("Asset file not found: " + storagePath);
         }
         cipher.secure(file);
+    }
+
+    private void requireMatchingChecksum(String expectedChecksumSha256, String actualChecksumSha256) {
+        if (expectedChecksumSha256 != null && !expectedChecksumSha256.equalsIgnoreCase(actualChecksumSha256)) {
+            throw new AssetChecksumMismatchException(expectedChecksumSha256, actualChecksumSha256);
+        }
     }
 
     private Path resolveTargetFile(UUID extensionId, UUID slotId, String filename) throws IOException {

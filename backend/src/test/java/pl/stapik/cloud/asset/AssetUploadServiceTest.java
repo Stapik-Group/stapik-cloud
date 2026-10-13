@@ -57,6 +57,9 @@ class AssetUploadServiceTest {
     @Mock
     private AssetStorage assetStorage;
 
+    @Mock
+    private AssetMimeTypePolicy assetMimeTypePolicy;
+
     private AssetUploadServiceImpl assetUploadService;
 
     @BeforeEach
@@ -66,6 +69,7 @@ class AssetUploadServiceTest {
                 documentSlotRepository,
                 assetService,
                 assetStorage,
+                assetMimeTypePolicy,
                 new AssetUploadProperties("/api/v1/asset-uploads", SESSION_TTL, DataSize.ofBytes(MAX_CHUNK_BYTES)),
                 Clock.fixed(NOW, ZoneOffset.UTC)
         );

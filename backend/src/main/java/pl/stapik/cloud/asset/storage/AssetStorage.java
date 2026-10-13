@@ -9,7 +9,7 @@ import java.util.UUID;
 
 public interface AssetStorage {
     record StoredAsset(String storagePath, String checksumSha256, long sizeBytes) { }
-    StoredAsset store(UUID extensionId, UUID slotId, String filename, MultipartFile file) throws IOException;
+    StoredAsset store(UUID extensionId, UUID slotId, String filename, MultipartFile file, String expectedChecksumSha256) throws IOException;
     Resource load(String storagePath) throws IOException;
     void delete(String storagePath) throws IOException;
     void beginUpload(UUID uploadId, UUID extensionId, UUID slotId, String filename) throws IOException;
