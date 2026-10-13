@@ -60,6 +60,10 @@ stapik-cloud:
     password: ${ADMIN_BOOTSTRAP_PASSWORD:}
   asset-storage:
     root-path: ${ASSET_STORAGE_ROOT:/var/lib/stapik-cloud/assets}
+  asset-upload:
+    base-path: /api/v1/asset-uploads
+    session-ttl: ${ASSET_UPLOAD_SESSION_TTL:24h}
+    max-chunk-size: ${ASSET_UPLOAD_MAX_CHUNK_SIZE:64MB}
   audit:
     retention-days: ${AUDIT_RETENTION_DAYS:365}
   rate-limit:

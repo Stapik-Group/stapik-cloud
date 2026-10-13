@@ -29,6 +29,7 @@ public class GlobalHttpLoggingFilter extends OncePerRequestFilter {
     private static final Logger fullLog = LoggerFactory.getLogger("HTTP_FULL");
     private static final String TRACE_ID_KEY = "traceId";
     private static final String MULTIPART_BODY_PLACEHOLDER = "MULTIPART_BODY_NOT_LOGGED";
+    private static final String BINARY_BODY_PLACEHOLDER = "BINARY_BODY_NOT_LOGGED";
 
     private final TruncatedLoggerBuilder truncatedLogger;
     private final JsonLoggerBuilder jsonLogger;
@@ -48,6 +49,8 @@ public class GlobalHttpLoggingFilter extends OncePerRequestFilter {
         String requestBody;
         if (isMultipart(request)) {
             requestBody = MULTIPART_BODY_PLACEHOLDER;
+        } else if (isBinary(request)) {
+            requestBody = BINARY_BODY_PLACEHOLDER;
         } else {
             CachedBodyHttpServletRequestWrapper cachedRequest = new CachedBodyHttpServletRequestWrapper(request);
             requestToPass = cachedRequest;
@@ -72,6 +75,11 @@ public class GlobalHttpLoggingFilter extends OncePerRequestFilter {
     private static boolean isMultipart(HttpServletRequest request) {
         String contentType = request.getContentType();
         return contentType != null && contentType.toLowerCase(Locale.ROOT).startsWith("multipart/");
+    }
+
+    private static boolean isBinary(HttpServletRequest request) {
+        String contentType = request.getContentType();
+        return contentType != null && contentType.toLowerCase(Locale.ROOT).startsWith("application/octet-stream");
     }
 
     private String loggableBody(String uri, String rawBody) {

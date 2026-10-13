@@ -16,6 +16,7 @@ security:
 tags:
   - name: documents
   - name: assets
+  - name: asset-uploads
   - name: system
 
 paths:
@@ -464,6 +465,133 @@ paths:
             application/json:
               schema:
                 $ref: 'common/error.yaml#/components/schemas/Problem'
+  /asset-uploads:
+    post:
+      operationId: createAssetUpload
+      tags: [asset-uploads]
+      summary: Start a resumable, chunked upload of a binary file (for files too large for a single multipart request)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAssetUploadRequest'
+      responses:
+        '201':
+          description: Upload started, the first chunk goes at offset 0
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetUploadResponse'
+        '404':
+          description: Document slot not found
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+        '413':
+          description: Declared file size exceeds the slot limit
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+
+  /asset-uploads/{uploadId}:
+    get:
+      operationId: getAssetUpload
+      tags: [asset-uploads]
+      summary: Current state of an upload; use its offset to resume after an interruption
+      parameters:
+        - $ref: '#/components/parameters/UploadIdParam'
+      responses:
+        '200':
+          description: Upload state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetUploadResponse'
+        '404':
+          description: Upload not found or expired; if the last chunk was sent, it may have completed - check the asset list
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+    patch:
+      operationId: appendAssetUploadChunk
+      tags: [asset-uploads]
+      x-internal: true
+      summary: >
+        Append the next chunk. The chunk must start at the upload's current offset and the request must carry
+        Content-Length. The upload completes, and the asset is stored, when the last byte arrives.
+      parameters:
+        - $ref: '#/components/parameters/UploadIdParam'
+        - name: Upload-Offset
+          in: header
+          required: true
+          description: Offset of the first byte of this chunk within the file.
+          schema:
+            type: integer
+            format: int64
+            minimum: 0
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: Chunk stored; the asset is present once the upload is complete
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetUploadResponse'
+        '404':
+          description: Upload not found or expired
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+        '409':
+          description: Upload-Offset does not match the upload offset - read it with GET and resume from there
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+        '411':
+          description: Content-Length is missing
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+        '413':
+          description: Chunk is larger than the allowed chunk size or than the bytes remaining
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+        '422':
+          description: Completed content does not match the declared SHA-256; the upload is discarded
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+    delete:
+      operationId: abortAssetUpload
+      tags: [asset-uploads]
+      summary: Abort an upload and discard the received data
+      parameters:
+        - $ref: '#/components/parameters/UploadIdParam'
+      responses:
+        '204':
+          description: Aborted
+        '404':
+          description: Upload not found or expired
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
   /health:
     get:
       operationId: getHealth
@@ -536,6 +664,13 @@ components:
       required: true
       schema:
         type: string
+    UploadIdParam:
+      name: uploadId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
 
   responses:
     NotFound:
@@ -671,6 +806,50 @@ components:
         updatedAt:
           type: string
           format: date-time
+
+    CreateAssetUploadRequest:
+      type: object
+      required: [slotKey, filename, sizeBytes]
+      properties:
+        slotKey:
+          type: string
+        filename:
+          type: string
+          maxLength: 255
+        sizeBytes:
+          type: integer
+          format: int64
+          minimum: 1
+        mimeType:
+          type: string
+          maxLength: 100
+        checksumSha256:
+          type: string
+          pattern: '^[0-9a-fA-F]{64}$'
+          description: Optional SHA-256 of the whole file; verified when the last chunk arrives.
+
+    AssetUploadResponse:
+      type: object
+      required: [uploadId, filename, sizeBytes, offset, expiresAt]
+      properties:
+        uploadId:
+          type: string
+          format: uuid
+        filename:
+          type: string
+        sizeBytes:
+          type: integer
+          format: int64
+        offset:
+          type: integer
+          format: int64
+          description: Number of bytes received so far; the next chunk starts here.
+        expiresAt:
+          type: string
+          format: date-time
+          description: The upload is discarded after this time; every chunk extends it.
+        asset:
+          $ref: '#/components/schemas/AssetMetadataResponse'
 
     AssetListResponse:
       type: object

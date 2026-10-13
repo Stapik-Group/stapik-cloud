@@ -24,6 +24,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AssetServiceImpl implements AssetService {
 
+    private static final String DEFAULT_MIME_TYPE = "application/octet-stream";
+
     private final AssetRepository assetRepository;
     private final DocumentSlotRepository documentSlotRepository;
     private final AssetStorage assetStorage;
@@ -44,24 +46,28 @@ public class AssetServiceImpl implements AssetService {
 
         try {
             AssetStorage.StoredAsset stored = assetStorage.store(identifier.getExtensionId(), slot.getId(), identifier.getFilename(), file);
-
-            AssetData assetData = assetRepository.findByDocumentSlotIdAndFilename(slot.getId(), identifier.getFilename())
-                    .orElseGet(() -> AssetData.builder()
-                            .documentSlotId(slot.getId())
-                            .filename(identifier.getFilename())
-                            .createdAt(Instant.now())
-                            .build());
-
-            assetData.setMimeType(file.getContentType() != null ? file.getContentType() : "application/octet-stream");
-            assetData.setSizeBytes(stored.sizeBytes());
-            assetData.setStoragePath(stored.storagePath());
-            assetData.setChecksumSha256(stored.checksumSha256());
-            assetData.setUpdatedAt(Instant.now());
-
-            return assetRepository.save(assetData);
+            return saveStoredAsset(slot, identifier.getFilename(), file.getContentType(), stored);
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to store asset: " + identifier.getFilename(), e);
         }
+    }
+
+    @Override
+    public AssetData saveStoredAsset(DocumentSlotData slot, String filename, String mimeType, AssetStorage.StoredAsset stored) {
+        AssetData assetData = assetRepository.findByDocumentSlotIdAndFilename(slot.getId(), filename)
+                .orElseGet(() -> AssetData.builder()
+                        .documentSlotId(slot.getId())
+                        .filename(filename)
+                        .createdAt(Instant.now())
+                        .build());
+
+        assetData.setMimeType(mimeType != null ? mimeType : DEFAULT_MIME_TYPE);
+        assetData.setSizeBytes(stored.sizeBytes());
+        assetData.setStoragePath(stored.storagePath());
+        assetData.setChecksumSha256(stored.checksumSha256());
+        assetData.setUpdatedAt(Instant.now());
+
+        return assetRepository.save(assetData);
     }
 
     @Override
