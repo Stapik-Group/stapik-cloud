@@ -2,6 +2,8 @@
 <configuration>
     <springProperty name="APP_LOG_LEVEL" source="APP_LOG_LEVEL" defaultValue="INFO"/>
 
+    <springProperty name="LOG_TOTAL_SIZE_CAP" source="LOG_TOTAL_SIZE_CAP" defaultValue="1GB"/>
+
     <!-- Console -->
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
@@ -26,7 +28,7 @@
 
             <maxFileSize>10MB</maxFileSize>
             <maxHistory>30</maxHistory>
-            <totalSizeCap>1GB</totalSizeCap>
+            <totalSizeCap>${LOG_TOTAL_SIZE_CAP}</totalSizeCap>
         </rollingPolicy>
     </appender>
     

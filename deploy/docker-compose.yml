@@ -1,9 +1,16 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: ${CONTAINER_LOG_MAX_SIZE:-10m}
+    max-file: ${CONTAINER_LOG_MAX_FILES:-3}
+
 services:
   postgres:
     image: postgres:16-alpine
     container_name: stapik-cloud-postgres
     restart: unless-stopped
     mem_limit: ${POSTGRES_MEM_LIMIT:-512m}
+    logging: *default-logging
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-stapik_cloud}
       POSTGRES_USER: ${POSTGRES_USER:-stapik}
@@ -25,6 +32,7 @@ services:
     container_name: stapik-cloud-app
     restart: unless-stopped
     mem_limit: ${APP_MEM_LIMIT:-1g}
+    logging: *default-logging
     depends_on:
       postgres:
         condition: service_healthy
@@ -43,9 +51,10 @@ services:
       ASSET_STORAGE_ROOT: /data/assets
       AUDIT_RETENTION_DAYS: ${AUDIT_RETENTION_DAYS:-365}
       FORCE_HTTPS: ${FORCE_HTTPS:-false}
+      LOG_TOTAL_SIZE_CAP: ${LOG_TOTAL_SIZE_CAP:-512MB}
     volumes:
       - asset-storage:/data/assets
-      - /opt/stapik-cloud/logs:/app/logs
+      - app-logs:/app/logs
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/actuator/health/readiness > /dev/null"]
       interval: 15s
@@ -64,6 +73,7 @@ services:
     container_name: stapik-cloud-admin
     restart: unless-stopped
     mem_limit: ${ADMIN_MEM_LIMIT:-384m}
+    logging: *default-logging
     depends_on:
       app:
         condition: service_healthy
@@ -84,3 +94,4 @@ services:
 volumes:
   postgres-data:
   asset-storage:
+  app-logs:
