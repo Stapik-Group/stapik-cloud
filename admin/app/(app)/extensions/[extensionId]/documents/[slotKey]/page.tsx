@@ -59,7 +59,7 @@ export default async function DocumentBrowserPage({ params, }: {
     const versions = versionsData.versions ?? [];
     const slotsData: DocumentSlotListResponse = await slotsRes.json();
     const slot = (slotsData.slots ?? []).find((slotEntry) => slotEntry.slotKey === slotKey);
-    const isJsonEditable = slot?.contentType === "JSON";
+    const isJsonEditable = slot?.contentType === "JSON" && !document.encrypted;
     const versionOptions = versions.map((version) => ({
         id: version.id,
         label: `${new Date(version.savedAt).toLocaleString(locale)} · ${t(REASON_KEYS[version.reason])}`,
@@ -89,6 +89,9 @@ export default async function DocumentBrowserPage({ params, }: {
                         mimeType={downloadMimeType}
                     />
                 </div>
+                {document.encrypted && (
+                    <p className="text-sm text-text-muted">{t("documents.encryptedNotice")}</p>
+                )}
                 {isJsonEditable ? (
                     <JsonDocumentEditor
                         key={document.contentHash}
