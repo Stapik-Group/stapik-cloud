@@ -26,6 +26,15 @@ class HttpBodyRedactorTest {
     }
 
     @Test
+    void shouldMaskTwoFactorSecretsAndCodes() {
+        String body = "{\"secret\":\"S\",\"provisioningUri\":\"u\",\"code\":\"123456\",\"challengeToken\":\"c\",\"backupCodes\":[\"a\",\"b\"],\"qrCodeSvg\":\"<svg/>\"}";
+
+        String result = redactor.redact("/api/admin/account/two-factor/setup", body);
+
+        assertThat(result).isEqualTo("{\"secret\":\"***\",\"provisioningUri\":\"***\",\"code\":\"***\",\"challengeToken\":\"***\",\"backupCodes\":\"***\",\"qrCodeSvg\":\"***\"}");
+    }
+
+    @Test
     void shouldMaskRawKeyInNestedObject() {
         String result = redactor.redact("/api/admin/extensions/1/keys", "{\"key\":{\"label\":\"a\"},\"rawKey\":\"abc\"}");
 

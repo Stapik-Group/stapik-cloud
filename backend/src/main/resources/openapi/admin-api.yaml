@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Stapik Cloud - Admin API
-  version: 1.0.5
+  version: 1.1.0
   description: >
     Admin panel API (React) - login, extension wizard, slot/key management, document
     browser, audit log. Authentication: JWT (Bearer), fully separated from client
@@ -15,6 +15,8 @@ security:
 
 tags:
   - name: auth
+  - name: account
+  - name: admin-users
   - name: extensions
   - name: slots
   - name: keys
@@ -26,7 +28,9 @@ paths:
     post:
       operationId: login
       tags: [auth]
-      summary: Log in to the admin panel, returns a JWT token
+      summary: >
+        Log in to the admin panel. Returns a session, or a two-factor challenge when the
+        account has two-factor authentication enabled.
       security: []
       requestBody:
         required: true
@@ -36,11 +40,11 @@ paths:
               $ref: '#/components/schemas/LoginRequest'
       responses:
         '200':
-          description: Logged in
+          description: Logged in, or a two-factor challenge was issued
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LoginResponse'
+                $ref: '#/components/schemas/LoginResult'
         '401':
           description: Wrong credentials
           content:
@@ -49,6 +53,38 @@ paths:
                 $ref: 'common/error.yaml#/components/schemas/Problem'
         '400':
           description: Missing credentials
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+
+  /auth/login/two-factor:
+    post:
+      operationId: completeTwoFactorLogin
+      tags: [auth]
+      summary: Finish a login with a TOTP code or a backup code
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TwoFactorLoginRequest'
+      responses:
+        '200':
+          description: Session issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Challenge expired or invalid, or the code is wrong
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+        '400':
+          description: Missing challenge or code
           content:
             application/json:
               schema:
@@ -103,6 +139,157 @@ paths:
           description: Refresh token revoked
         '400':
           description: Missing refresh token
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+
+  /account:
+    get:
+      operationId: getAccount
+      tags: [account]
+      summary: Signed-in admin account and its two-factor state
+      responses:
+        '200':
+          description: Account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountResponse'
+
+  /account/two-factor/setup:
+    post:
+      operationId: beginTwoFactorSetup
+      tags: [account]
+      summary: Generate a new TOTP secret and QR code, two-factor stays off until confirmed
+      responses:
+        '200':
+          description: Secret to scan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TwoFactorSetupResponse'
+        '409':
+          description: Two-factor authentication is already enabled
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+
+  /account/two-factor/enable:
+    post:
+      operationId: enableTwoFactor
+      tags: [account]
+      summary: Confirm the setup with a TOTP code, returns one-time backup codes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TwoFactorEnableRequest'
+      responses:
+        '200':
+          description: Two-factor enabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BackupCodesResponse'
+        '400':
+          description: Wrong code
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+        '409':
+          description: Setup not started or two-factor already enabled
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+
+  /account/two-factor/disable:
+    post:
+      operationId: disableTwoFactor
+      tags: [account]
+      summary: Turn two-factor authentication off
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TwoFactorConfirmationRequest'
+      responses:
+        '204':
+          description: Two-factor disabled
+        '400':
+          description: Wrong password or code
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+        '409':
+          description: Two-factor authentication is not enabled
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+
+  /account/two-factor/backup-codes:
+    post:
+      operationId: regenerateBackupCodes
+      tags: [account]
+      summary: Replace all backup codes with a new set
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TwoFactorConfirmationRequest'
+      responses:
+        '200':
+          description: New backup codes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BackupCodesResponse'
+        '400':
+          description: Wrong password or code
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+        '409':
+          description: Two-factor authentication is not enabled
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+
+  /admin-users:
+    get:
+      operationId: listAdminUsers
+      tags: [admin-users]
+      summary: List admin accounts with their two-factor state
+      responses:
+        '200':
+          description: Admin accounts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserListResponse'
+
+  /admin-users/{adminUserId}/two-factor/reset:
+    post:
+      operationId: resetAdminUserTwoFactor
+      tags: [admin-users]
+      summary: Owner-only recovery - clear two-factor state and revoke the account's sessions
+      parameters:
+        - $ref: '#/components/parameters/AdminUserIdParam'
+      responses:
+        '204':
+          description: Two-factor reset
+        '404':
+          description: Admin account not found
           content:
             application/json:
               schema:
@@ -471,6 +658,13 @@ components:
         ETag of the document version the editor loaded. A missing or stale value is a conflict.
       schema:
         type: string
+    AdminUserIdParam:
+      name: adminUserId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
     ExtensionIdParam:
       name: extensionId
       in: path
@@ -537,6 +731,105 @@ components:
         refreshExpiresAt:
           type: string
           format: date-time
+
+    LoginResult:
+      type: object
+      required: [twoFactorRequired]
+      properties:
+        twoFactorRequired:
+          type: boolean
+        challengeToken:
+          type: string
+        challengeExpiresAt:
+          type: string
+          format: date-time
+        session:
+          $ref: '#/components/schemas/LoginResponse'
+
+    TwoFactorLoginRequest:
+      type: object
+      required: [challengeToken, code]
+      properties:
+        challengeToken:
+          type: string
+        code:
+          type: string
+          minLength: 1
+
+    AccountResponse:
+      type: object
+      required: [username, role, twoFactorEnabled, backupCodesRemaining]
+      properties:
+        username:
+          type: string
+        role:
+          type: string
+        twoFactorEnabled:
+          type: boolean
+        backupCodesRemaining:
+          type: integer
+          format: int64
+
+    TwoFactorSetupResponse:
+      type: object
+      required: [secret, provisioningUri, qrCodeSvg]
+      properties:
+        secret:
+          type: string
+        provisioningUri:
+          type: string
+        qrCodeSvg:
+          type: string
+
+    TwoFactorEnableRequest:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          minLength: 1
+
+    TwoFactorConfirmationRequest:
+      type: object
+      required: [password, code]
+      properties:
+        password:
+          type: string
+        code:
+          type: string
+          minLength: 1
+
+    BackupCodesResponse:
+      type: object
+      required: [backupCodes]
+      properties:
+        backupCodes:
+          type: array
+          items:
+            type: string
+
+    AdminUserResponse:
+      type: object
+      required: [id, username, role, twoFactorEnabled]
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        role:
+          type: string
+        twoFactorEnabled:
+          type: boolean
+
+    AdminUserListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminUserResponse'
 
     RefreshTokenRequest:
       type: object

@@ -9,9 +9,13 @@ import pl.stapik.cloud.admin.api.AuthApiDelegate;
 import pl.stapik.cloud.admin.data.AdminUserData;
 import pl.stapik.cloud.admin.data.LoginRequest;
 import pl.stapik.cloud.admin.data.LoginResponse;
+import pl.stapik.cloud.admin.data.LoginResult;
 import pl.stapik.cloud.admin.data.RefreshTokenRequest;
+import pl.stapik.cloud.admin.data.TwoFactorLoginRequest;
 import pl.stapik.cloud.admin.dto.AdminSession;
 import pl.stapik.cloud.admin.dto.Credentials;
+import pl.stapik.cloud.security.admin.JwtService;
+import pl.stapik.cloud.security.admin.TwoFactorChallenge;
 import pl.stapik.cloud.security.ratelimit.LoginAttemptTracker;
 
 import java.time.ZoneOffset;
@@ -22,11 +26,38 @@ public class AdminAuthDelegate implements AuthApiDelegate {
 
     private final AdminUserService adminUserService;
     private final AdminSessionService adminSessionService;
+    private final AdminTwoFactorService adminTwoFactorService;
     private final LoginAttemptTracker loginAttemptTracker;
+    private final JwtService jwtService;
 
     @Override
-    public ResponseEntity<LoginResponse> login(LoginRequest loginRequest) {
+    public ResponseEntity<LoginResult> login(LoginRequest loginRequest) {
         AdminUserData adminUser = getAdminUserData(loginRequest);
+        if (adminUser.isTotpEnabled()) {
+            return ResponseEntity.ok(toChallengeResult(
+                    jwtService.generateTwoFactorChallenge(adminUser.getId(), adminUser.getUsername())));
+        }
+
+        loginAttemptTracker.reset(adminUser.getUsername());
+        return ResponseEntity.ok(new LoginResult()
+                .twoFactorRequired(false)
+                .session(toLoginResponse(adminSessionService.startSession(adminUser))));
+    }
+
+    @Override
+    public ResponseEntity<LoginResponse> completeTwoFactorLogin(TwoFactorLoginRequest request) {
+        AdminUserData adminUser = jwtService.validateTwoFactorChallenge(request.getChallengeToken())
+                .flatMap(adminUserService::findById)
+                .orElseThrow(() -> new BadCredentialsException("Invalid or expired challenge"));
+
+        String username = adminUser.getUsername();
+        loginAttemptTracker.checkNotLocked(username);
+        if (!adminTwoFactorService.verifyLoginCode(adminUser.getId(), request.getCode())) {
+            loginAttemptTracker.recordFailure(username);
+            throw new BadCredentialsException("Invalid verification code");
+        }
+
+        loginAttemptTracker.reset(username);
         return ResponseEntity.ok(toLoginResponse(adminSessionService.startSession(adminUser)));
     }
 
@@ -43,6 +74,13 @@ public class AdminAuthDelegate implements AuthApiDelegate {
         return ResponseEntity.noContent().build();
     }
 
+    private LoginResult toChallengeResult(TwoFactorChallenge challenge) {
+        return new LoginResult()
+                .twoFactorRequired(true)
+                .challengeToken(challenge.token())
+                .challengeExpiresAt(challenge.expiresAt().atOffset(ZoneOffset.UTC));
+    }
+
     private LoginResponse toLoginResponse(AdminSession session) {
         return new LoginResponse()
                 .token(session.accessToken())
@@ -54,12 +92,10 @@ public class AdminAuthDelegate implements AuthApiDelegate {
     private @NonNull AdminUserData getAdminUserData(LoginRequest loginRequest) {
         String username = loginRequest.getUsername();
         loginAttemptTracker.checkNotLocked(username);
-        AdminUserData adminUser = adminUserService.authenticate(Credentials.fromLoginRequest(loginRequest))
+        return adminUserService.authenticate(Credentials.fromLoginRequest(loginRequest))
                 .orElseThrow(() -> {
                     loginAttemptTracker.recordFailure(username);
                     return new BadCredentialsException("Invalid credentials");
                 });
-        loginAttemptTracker.reset(username);
-        return adminUser;
     }
 }

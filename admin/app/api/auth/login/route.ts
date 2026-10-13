@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { API_BASE_URL, AUTH_COOKIE_NAME, REFRESH_COOKIE_NAME } from "@/lib/api-client";
-import { sessionCookieOptions, type LoginTokens } from "@/lib/auth-session";
+import { API_BASE_URL, CHALLENGE_COOKIE_NAME } from "@/lib/api-client";
+import { sessionCookieOptions, setSessionCookies, type LoginResult } from "@/lib/auth-session";
 
 export async function POST(request: NextRequest) {
     const body = await request.json();
@@ -19,11 +19,18 @@ export async function POST(request: NextRequest) {
         );
     }
 
-    const { token, expiresAt, refreshToken, refreshExpiresAt }: LoginTokens = await backendResponse.json();
-
+    const result: LoginResult = await backendResponse.json();
     const cookieStore = await cookies();
-    cookieStore.set(AUTH_COOKIE_NAME, token, sessionCookieOptions(expiresAt));
-    cookieStore.set(REFRESH_COOKIE_NAME, refreshToken, sessionCookieOptions(refreshExpiresAt));
 
-    return NextResponse.json({ ok: true });
+    if (result.twoFactorRequired && result.challengeToken && result.challengeExpiresAt) {
+        cookieStore.set(CHALLENGE_COOKIE_NAME, result.challengeToken, sessionCookieOptions(result.challengeExpiresAt));
+        return NextResponse.json({ twoFactorRequired: true });
+    }
+
+    if (result.session) {
+        setSessionCookies(cookieStore, result.session);
+        return NextResponse.json({ twoFactorRequired: false });
+    }
+
+    return NextResponse.json({ message: "Unexpected login response" }, { status: 502 });
 }

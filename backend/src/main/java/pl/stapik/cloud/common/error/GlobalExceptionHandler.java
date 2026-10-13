@@ -10,6 +10,8 @@ import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
+import pl.stapik.cloud.admin.TwoFactorStateException;
+import pl.stapik.cloud.admin.TwoFactorVerificationException;
 import pl.stapik.cloud.security.ratelimit.TooManyRequestsException;
 
 import java.net.URI;
@@ -58,6 +60,22 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         problem.setTitle("Duplicate resource");
         problem.setProperty("constraint", ex.getConstraintName());
         problem.setType(URI.create("urn:error:duplicate-resource"));
+        return problem;
+    }
+
+    @ExceptionHandler(TwoFactorVerificationException.class)
+    public ProblemDetail handleTwoFactorVerification(TwoFactorVerificationException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        problem.setTitle("Verification failed");
+        problem.setType(URI.create("urn:error:auth:two-factor-verification"));
+        return problem;
+    }
+
+    @ExceptionHandler(TwoFactorStateException.class)
+    public ProblemDetail handleTwoFactorState(TwoFactorStateException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        problem.setTitle("Two-factor state conflict");
+        problem.setType(URI.create("urn:error:auth:two-factor-state"));
         return problem;
     }
 

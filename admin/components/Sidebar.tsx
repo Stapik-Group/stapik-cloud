@@ -12,6 +12,8 @@ export function Sidebar() {
     const NAV_ITEMS = [
         { href: "/dashboard", label: t("nav.extensions") },
         { href: "/audit-log", label: t("nav.auditLog") },
+        { href: "/admin-users", label: t("nav.adminUsers") },
+        { href: "/account", label: t("nav.account") },
     ];
 
     async function handleLogout() {

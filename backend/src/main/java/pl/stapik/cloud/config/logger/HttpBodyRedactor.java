@@ -19,7 +19,8 @@ public class HttpBodyRedactor {
     static final String BODY_NOT_LOGGED = "BODY_NOT_LOGGED";
 
     private static final Pattern USER_CONTENT_URI = Pattern.compile("/(documents|assets)(/|$)");
-    private static final Set<String> SENSITIVE_FIELDS = Set.of("password", "token", "refreshtoken", "rawkey");
+    private static final Set<String> SENSITIVE_FIELDS = Set.of(
+            "password", "token", "refreshtoken", "rawkey", "code", "challengetoken", "secret", "provisioninguri", "backupcodes", "qrcodesvg");
 
     private final ObjectMapper objectMapper;
 

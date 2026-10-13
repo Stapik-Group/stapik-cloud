@@ -87,7 +87,8 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/admin/auth/login", "/api/admin/auth/refresh", "/api/admin/auth/logout").permitAll()
+                        .requestMatchers("/api/admin/auth/login", "/api/admin/auth/login/two-factor", "/api/admin/auth/refresh", "/api/admin/auth/logout").permitAll()
+                        .requestMatchers("/api/admin/account/**").authenticated()
                         .requestMatchers(HttpMethod.GET, apiAdminAllPattern).authenticated()
                         .requestMatchers(HttpMethod.HEAD, apiAdminAllPattern).authenticated()
                         .requestMatchers(HttpMethod.OPTIONS, apiAdminAllPattern).authenticated()
