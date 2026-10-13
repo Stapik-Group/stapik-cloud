@@ -7,6 +7,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import pl.stapik.cloud.AbstractIntegrationTest;
+import pl.stapik.cloud.common.crypto.ContentEncryptor;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -38,6 +39,9 @@ class AdminDocumentDelegateTest extends AbstractIntegrationTest {
 
     @Autowired
     private DataSource dataSource;
+
+    @Autowired
+    private ContentEncryptor contentEncryptor;
 
     private UUID extensionId;
     private UUID documentId;
@@ -226,7 +230,7 @@ class AdminDocumentDelegateTest extends AbstractIntegrationTest {
             statement.setObject(1, id);
             try (ResultSet resultSet = statement.executeQuery()) {
                 resultSet.next();
-                return resultSet.getString(1);
+                return contentEncryptor.decrypt(resultSet.getString(1));
             }
         }
     }

@@ -1,6 +1,7 @@
 package pl.stapik.cloud.document.data;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -13,6 +14,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import pl.stapik.cloud.common.crypto.EncryptedContentConverter;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -33,6 +35,7 @@ public class DocumentVersionData {
     @Column(name = "document_id", nullable = false)
     private UUID documentId;
 
+    @Convert(converter = EncryptedContentConverter.class)
     @Column(nullable = false, columnDefinition = "text")
     private String content;
 
