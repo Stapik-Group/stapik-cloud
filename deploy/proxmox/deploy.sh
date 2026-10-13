@@ -430,6 +430,7 @@ else
   GENERATED_POSTGRES_PASSWORD="$(openssl rand -base64 24)"
   GENERATED_JWT_SECRET="$(openssl rand -base64 48)"
   GENERATED_ADMIN_PASSWORD="$(openssl rand -base64 18)"
+  GENERATED_ENCRYPTION_KEY="$(openssl rand -base64 32)"
 
   ENV_FILE="$(mktemp)"
   cat > "${ENV_FILE}" <<EOF
@@ -438,6 +439,8 @@ POSTGRES_USER=stapik
 POSTGRES_PASSWORD=${GENERATED_POSTGRES_PASSWORD}
 JWT_SECRET=${GENERATED_JWT_SECRET}
 JWT_EXPIRATION_MINUTES=60
+ENCRYPTION_KEYS=1:${GENERATED_ENCRYPTION_KEY}
+ENCRYPTION_ACTIVE_KEY_ID=1
 ADMIN_ALLOWED_ORIGINS=http://${CONTAINER_IP}:3000
 ADMIN_BOOTSTRAP_USERNAME=admin
 ADMIN_BOOTSTRAP_PASSWORD=${GENERATED_ADMIN_PASSWORD}
@@ -448,6 +451,13 @@ EOF
   pct exec "${CTID}" -- chmod 600 "${APP_DIR}/deploy/.env"
   rm -f "${ENV_FILE}"
   SECRETS_KEPT=false
+fi
+
+ENCRYPTION_KEY_ADDED=false
+if ! pct exec "${CTID}" -- grep -q '^ENCRYPTION_KEYS=' "${APP_DIR}/deploy/.env"; then
+  GENERATED_ENCRYPTION_KEY="$(openssl rand -base64 32)"
+  pct exec "${CTID}" -- bash -c "printf '\nENCRYPTION_KEYS=1:%s\nENCRYPTION_ACTIVE_KEY_ID=1\n' '${GENERATED_ENCRYPTION_KEY}' >> '${APP_DIR}/deploy/.env'"
+  ENCRYPTION_KEY_ADDED=true
 fi
 
 # ---- Build and (re)start the stack ----
@@ -492,6 +502,7 @@ if [ "${SECRETS_KEPT}" = false ]; then
   echo "Generated credentials (SAVE THESE NOW, shown only once):"
   echo "  POSTGRES_PASSWORD:       ${GENERATED_POSTGRES_PASSWORD}"
   echo "  JWT_SECRET:              ${GENERATED_JWT_SECRET}"
+  echo "  ENCRYPTION_KEYS:         1:${GENERATED_ENCRYPTION_KEY}"
   echo "  ADMIN_BOOTSTRAP_USERNAME: admin"
   echo "  ADMIN_BOOTSTRAP_PASSWORD: ${GENERATED_ADMIN_PASSWORD}"
   echo ""
@@ -500,5 +511,12 @@ if [ "${SECRETS_KEPT}" = false ]; then
 else
   echo "Existing secrets were kept — see ${APP_DIR}/deploy/.env inside the"
   echo "container if you need to look them up again."
+fi
+
+if [ "${ENCRYPTION_KEY_ADDED}" = true ]; then
+  echo ""
+  echo "A new at-rest encryption key was added to the existing .env (SAVE IT NOW, shown only once):"
+  echo "  ENCRYPTION_KEYS:         1:${GENERATED_ENCRYPTION_KEY}"
+  echo "Existing documents and assets are encrypted with it on the first start."
 fi
 echo "=================================================================="

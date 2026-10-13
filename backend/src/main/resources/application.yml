@@ -64,6 +64,9 @@ stapik-cloud:
     base-path: /api/v1/asset-uploads
     session-ttl: ${ASSET_UPLOAD_SESSION_TTL:24h}
     max-chunk-size: ${ASSET_UPLOAD_MAX_CHUNK_SIZE:64MB}
+  encryption:
+    active-key-id: ${ENCRYPTION_ACTIVE_KEY_ID:1}
+    keys: ${ENCRYPTION_KEYS}
   audit:
     retention-days: ${AUDIT_RETENTION_DAYS:365}
   rate-limit:
