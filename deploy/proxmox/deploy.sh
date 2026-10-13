@@ -13,7 +13,7 @@
 #               1. checks free space and storage, fetches the new code (read-only)
 #               2. dumps the database (pg_dump) and stops the stack (consistent state)
 #               3. backs up the whole LXC with vzdump and verifies the archive
-#               4. resets the code, rebuilds the images, starts the stack
+#               4. checks out the release, pulls its images from the registry, starts the stack
 #               5. waits for the health checks of backend and admin panel
 #             If something fails, the script puts things back by itself:
 #               - before the new version started: previous code and stack are restored
@@ -21,14 +21,18 @@
 #                 the whole LXC is restored from the backup from step 3
 #             The existing .env is never touched, so passwords and the JWT secret stay stable.
 #
+# What gets deployed: the newest stable release tag (vX.Y.Z) and its prebuilt images from the
+# container registry. Nothing is built on the server.
+#
 # Optional environment variables:
+#   VERSION          release tag to deploy, e.g. v1.2.0 (also for going back) (default: newest stable)
 #   BACKUP_STORAGE   Proxmox storage that accepts backups            (default: local)
 #   BACKUP_MODE      vzdump mode: snapshot | suspend | stop          (default: snapshot)
 #   BACKUPS_TO_KEEP  how many backups / database dumps to keep       (default: 3)
 #   AUTO_ROLLBACK    restore the backup when the new version fails   (default: true)
 #   HEALTH_TIMEOUT   seconds to wait for the stack after an update   (default: 240)
 #   MIN_FREE_GB      required free disk space inside the container   (default: 3)
-#   FORCE_REBUILD    rebuild even if the code is already up to date  (default: false)
+#   FORCE_REBUILD    redeploy even if the release is already running (default: false)
 #   SKIP_BACKUP      update without a backup - NOT recommended       (default: false)
 #   ASSUME_YES       do not ask for confirmation on restore          (default: false)
 set -Eeuo pipefail
@@ -52,6 +56,7 @@ BACKUP_STORAGE="${BACKUP_STORAGE:-local}"
 BACKUP_MODE="${BACKUP_MODE:-snapshot}"
 BACKUPS_TO_KEEP="${BACKUPS_TO_KEEP:-3}"
 AUTO_ROLLBACK="${AUTO_ROLLBACK:-true}"
+VERSION="${VERSION:-}"
 HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-240}"
 MIN_FREE_GB="${MIN_FREE_GB:-3}"
 FORCE_REBUILD="${FORCE_REBUILD:-false}"
@@ -68,6 +73,9 @@ TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
 PHASE="init"
 BACKUP_VOLID=""
 OLD_REV=""
+OLD_VERSION=""
+TARGET_TAG=""
+TARGET_VERSION=""
 UPDATE_MODE=false
 HAS_DEPLOYMENT=false
 
@@ -78,6 +86,34 @@ die()  { echo "[$(date +%H:%M:%S)] ERROR: $*" >&2; exit 1; }
 
 # Runs a docker compose command inside the container (arguments must not contain spaces).
 compose() { pct exec "${CTID}" -- bash -c "cd ${APP_DIR}/deploy && docker compose $*"; }
+
+# Sets TARGET_TAG (e.g. v1.2.0) and TARGET_VERSION (1.2.0, the image tag) after fetching the tags.
+resolve_target_release() {
+  TARGET_TAG="${VERSION}"
+  if [ -z "${TARGET_TAG}" ]; then
+    TARGET_TAG="$(pct exec "${CTID}" -- git -C "${APP_DIR}" tag --list --sort=-v:refname \
+      | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sed -n 1p)"
+  fi
+  [ -n "${TARGET_TAG}" ] || die "No release tag (vX.Y.Z) found in the repository. Publish a release first or set VERSION."
+  pct exec "${CTID}" -- git -C "${APP_DIR}" rev-parse --verify --quiet "refs/tags/${TARGET_TAG}^{commit}" > /dev/null \
+    || die "Release ${TARGET_TAG} does not exist in the repository."
+  TARGET_VERSION="${TARGET_TAG#v}"
+}
+
+current_image_version() {
+  pct exec "${CTID}" -- bash -c "grep -s '^STAPIK_VERSION=' '${APP_DIR}/deploy/.env' | cut -d= -f2" || true
+}
+
+# An empty version removes the setting, which makes docker compose build the images locally again.
+set_image_version() {
+  pct exec "${CTID}" -- bash -c '
+    env_file="$1/deploy/.env"; version="$2"
+    sed -i "/^STAPIK_VERSION=/d" "${env_file}"
+    [ -z "${version}" ] && exit 0
+    [ -z "$(tail -c1 "${env_file}")" ] || echo >> "${env_file}"
+    echo "STAPIK_VERSION=${version}" >> "${env_file}"
+  ' _ "${APP_DIR}" "$1"
+}
 
 [ "$(id -u)" -eq 0 ] || die "Run this script as root on the Proxmox host."
 for required_command in pct pvesm vzdump flock; do
@@ -270,7 +306,7 @@ recover_after_failure() {
       ;;
     code_changed)
       log "The new version never started - putting back the previous code (${OLD_REV}) and stack..."
-      { pct exec "${CTID}" -- git -C "${APP_DIR}" reset --hard "${OLD_REV}" && compose up -d; } \
+      { pct exec "${CTID}" -- git -C "${APP_DIR}" reset --hard "${OLD_REV}" && set_image_version "${OLD_VERSION}" && compose up -d; } \
         || warn "Could not restore the previous stack automatically. Restore the backup: bash deploy.sh restore ${BACKUP_VOLID:-<volid>}"
       ;;
     started)
@@ -383,17 +419,22 @@ if [ "${UPDATE_MODE}" = true ] && [ "${HAS_DEPLOYMENT}" = true ]; then
   preflight_checks
 
   OLD_REV="$(pct exec "${CTID}" -- git -C "${APP_DIR}" rev-parse HEAD)"
-  # This is a deployment target, not a dev clone — it is forced to match the remote branch exactly.
-  pct exec "${CTID}" -- git -C "${APP_DIR}" fetch origin
-  TARGET_REF="$(pct exec "${CTID}" -- bash -c "cd ${APP_DIR} && echo \"origin/\$(git symbolic-ref --short HEAD)\"")"
-  NEW_REV="$(pct exec "${CTID}" -- git -C "${APP_DIR}" rev-parse "${TARGET_REF}")"
+  OLD_VERSION="$(current_image_version)"
+  # This is a deployment target, not a dev clone — it is forced to match the release tag exactly.
+  pct exec "${CTID}" -- git -C "${APP_DIR}" fetch origin --tags --force
+  resolve_target_release
+  TARGET_REF="refs/tags/${TARGET_TAG}"
+  NEW_REV="$(pct exec "${CTID}" -- git -C "${APP_DIR}" rev-parse "${TARGET_REF}^{commit}")"
 
-  if [ "${OLD_REV}" = "${NEW_REV}" ] && [ "${FORCE_REBUILD}" != true ] && wait_for_healthy; then
-    log "Already up to date (${OLD_REV:0:10}) and healthy. Use FORCE_REBUILD=true to rebuild anyway."
+  if [ "${OLD_REV}" = "${NEW_REV}" ] && [ "${OLD_VERSION}" = "${TARGET_VERSION}" ] && [ "${FORCE_REBUILD}" != true ] && wait_for_healthy; then
+    log "Release ${TARGET_TAG} (${OLD_REV:0:10}) is already running and healthy. Use FORCE_REBUILD=true to redeploy anyway."
     exit 0
   fi
 
-  log "Updating ${OLD_REV:0:10} -> ${NEW_REV:0:10}"
+  log "Updating ${OLD_VERSION:-<local build>} (${OLD_REV:0:10}) -> ${TARGET_TAG} (${NEW_REV:0:10})"
+  if pct exec "${CTID}" -- git -C "${APP_DIR}" merge-base --is-ancestor "${NEW_REV}" "${OLD_REV}" && [ "${OLD_REV}" != "${NEW_REV}" ]; then
+    warn "${TARGET_TAG} is OLDER than the running version. Database migrations are not reverted - if the schema changed, restore a backup instead."
+  fi
   pct exec "${CTID}" -- git -C "${APP_DIR}" log --oneline "${OLD_REV}..${NEW_REV}" | head -n 20 || true
   LOCAL_CHANGES="$(pct exec "${CTID}" -- git -C "${APP_DIR}" status --short)"
   if [ -n "${LOCAL_CHANGES}" ]; then
@@ -413,10 +454,14 @@ if [ "${UPDATE_MODE}" = true ] && [ "${HAS_DEPLOYMENT}" = true ]; then
   PHASE="code_changed"
   pct exec "${CTID}" -- git -C "${APP_DIR}" reset --hard "${TARGET_REF}"
 elif [ "${HAS_DEPLOYMENT}" = true ]; then
-  pct exec "${CTID}" -- git -C "${APP_DIR}" fetch origin
+  pct exec "${CTID}" -- git -C "${APP_DIR}" fetch origin --tags --force
+  resolve_target_release
+  pct exec "${CTID}" -- git -C "${APP_DIR}" reset --hard "refs/tags/${TARGET_TAG}"
 else
   # ---- Clone the repository ----
   pct exec "${CTID}" -- git clone "${REPO_URL}" "${APP_DIR}"
+  resolve_target_release
+  pct exec "${CTID}" -- git -C "${APP_DIR}" reset --hard "refs/tags/${TARGET_TAG}"
 fi
 
 # ---- Read the container's IP ----
@@ -460,10 +505,11 @@ if ! pct exec "${CTID}" -- grep -q '^ENCRYPTION_KEYS=' "${APP_DIR}/deploy/.env";
   ENCRYPTION_KEY_ADDED=true
 fi
 
-# ---- Build and (re)start the stack ----
-# The images are built first: a failing build never touches the running (or stopped) previous version.
-log "Building the images..."
-compose build
+# ---- Pull and (re)start the stack ----
+# The images are pulled first: a failing pull never touches the running (or stopped) previous version.
+set_image_version "${TARGET_VERSION}"
+log "Pulling the images of ${TARGET_TAG}..."
+compose pull
 
 # From here on the new version may run database migrations, so a failure means restoring the backup.
 PHASE="started"
@@ -475,7 +521,7 @@ if [ "${UPDATE_MODE}" = true ] && [ "${HAS_DEPLOYMENT}" = true ] || [ "${UPDATE_
 fi
 
 PHASE="done"
-pct exec "${CTID}" -- docker image prune -f > /dev/null 2>&1 || true
+pct exec "${CTID}" -- docker image prune -af --filter "until=336h" > /dev/null 2>&1 || true
 if [ "${UPDATE_MODE}" = true ] && [ -n "${BACKUP_VOLID}" ]; then
   prune_backups
 fi
@@ -483,9 +529,9 @@ fi
 echo ""
 echo "=================================================================="
 if [ "${UPDATE_MODE}" = true ]; then
-  echo "Update complete. Stapik Cloud is running in LXC ${CTID} (${HOSTNAME})."
+  echo "Update complete. Stapik Cloud ${TARGET_TAG} is running in LXC ${CTID} (${HOSTNAME})."
 else
-  echo "Done. Stapik Cloud is running in LXC ${CTID} (${HOSTNAME})."
+  echo "Done. Stapik Cloud ${TARGET_TAG} is running in LXC ${CTID} (${HOSTNAME})."
 fi
 echo "Container IP: ${CONTAINER_IP}"
 echo "Backend:      http://127.0.0.1:8080 (inside the container only - expose it through a reverse proxy)"

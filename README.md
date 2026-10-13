@@ -54,7 +54,7 @@ Quick start on a Proxmox host:
 bash <(curl -fsSL https://raw.githubusercontent.com/Stapik-Group/stapik-cloud/master/deploy/proxmox/deploy.sh)
 ```
 
-Running the same command again updates an existing installation (pulls the latest code, rebuilds, restarts) without touching existing secrets or data.
+Running the same command again updates an existing installation (checks out the newest release, pulls its prebuilt images from the registry, restarts). Use `VERSION=v1.2.0 bash deploy.sh` to deploy a specific release without touching existing secrets or data.
 
 See [`deploy/README.md`](deploy/README.md) for the full walkthrough, configuration, and security notes.
 
