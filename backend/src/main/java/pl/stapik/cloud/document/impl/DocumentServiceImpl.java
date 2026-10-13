@@ -9,6 +9,8 @@ import pl.stapik.cloud.document.DocumentModifiedException;
 import pl.stapik.cloud.document.DocumentRepository;
 import pl.stapik.cloud.document.DocumentService;
 import pl.stapik.cloud.document.DocumentVersionRepository;
+import pl.stapik.cloud.document.EncryptedDocumentContent;
+import pl.stapik.cloud.document.EncryptedDocumentException;
 import pl.stapik.cloud.document.conflict.ConflictDecision;
 import pl.stapik.cloud.document.conflict.ConflictResolver;
 import pl.stapik.cloud.document.data.DocumentData;
@@ -67,6 +69,10 @@ public class DocumentServiceImpl implements DocumentService {
         DocumentSnapshot to = toVersionId == null
                 ? DocumentSnapshot.ofCurrent(documentData)
                 : DocumentSnapshot.ofVersion(requireVersion(documentData, toVersionId));
+
+        if (EncryptedDocumentContent.isEncrypted(from.content()) || EncryptedDocumentContent.isEncrypted(to.content())) {
+            throw new EncryptedDocumentException(slot.getSlotKey());
+        }
 
         return new DocumentComparison(from, to, JsonDiffer.diff(from.content(), to.content()));
     }
@@ -128,6 +134,10 @@ public class DocumentServiceImpl implements DocumentService {
     public DocumentData updateContent(DocumentIdentifier identifier, String content, String clientContentHash) {
         DocumentSlotData slot = requireSlot(identifier);
         DocumentData existing = requireCurrentDocumentForUpdate(slot, identifier);
+
+        if (EncryptedDocumentContent.isEncrypted(existing.getContent())) {
+            throw new EncryptedDocumentException(slot.getSlotKey());
+        }
 
         if (isUnchanged(existing, content)) {
             return existing;

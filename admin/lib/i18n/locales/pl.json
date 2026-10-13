@@ -96,6 +96,7 @@
   "documents.diffType.ADDED": "dodano",
   "documents.diffType.REMOVED": "usunięto",
   "documents.diffType.CHANGED": "zmieniono",
+  "documents.encryptedNotice": "Ten dokument jest zaszyfrowany end-to-end na urządzeniu użytkownika. Serwer widzi tylko zaszyfrowany blob, więc nie można go edytować ani porównywać wersji.",
   "apiKeys.revokeConfirm": "Odwołać ten klucz? Tego nie da się cofnąć.",
   "apiKeys.revoking": "...",
   "apiKeys.revokeButton": "Odwołaj"

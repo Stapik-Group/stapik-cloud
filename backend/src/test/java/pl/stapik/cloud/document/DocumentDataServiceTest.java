@@ -65,6 +65,7 @@ class DocumentDataServiceTest {
     private static final UUID SLOT_ID = UUID.randomUUID();
     private static final String SLOT_KEY = "slot-key";
     private static final String EXISTING_HASH = "existing-hash";
+    private static final String ENCRYPTED_CONTENT = "{\"format\":\"stapik-e2e\",\"version\":1}";
     private static final DocumentWriter WRITER = new DocumentWriter(UUID.randomUUID(), "pixel-7");
 
     @BeforeEach
@@ -467,6 +468,26 @@ class DocumentDataServiceTest {
     }
 
     @Test
+    void shouldRejectCompareWhenAnyVersionIsEncrypted() {
+        // given
+        DocumentSlotData slot = slot(ConflictStrategy.LAST_WRITE_WINS);
+        UUID documentId = UUID.randomUUID();
+        DocumentData documentData = DocumentData.builder().id(documentId).documentSlotId(SLOT_ID).content(ENCRYPTED_CONTENT).build();
+        UUID fromId = UUID.randomUUID();
+
+        when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY)).thenReturn(Optional.of(slot));
+        when(documentRepository.findByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.of(documentData));
+        when(documentVersionRepository.findById(fromId)).thenReturn(Optional.of(
+                DocumentVersionData.builder().id(fromId).documentId(documentId).content("{\"a\": 1}").build()));
+
+        // when / then
+        DocumentIdentifier documentIdentifier = DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY);
+        assertThatThrownBy(() -> documentServiceImpl.compareVersions(documentIdentifier, fromId, null))
+                .isInstanceOf(EncryptedDocumentException.class)
+                .hasMessageContaining(SLOT_KEY);
+    }
+
+    @Test
     void shouldThrowWhenVersionBelongsToAnotherDocumentOnCompare() {
         // given
         DocumentSlotData slot = slot(ConflictStrategy.LAST_WRITE_WINS);
@@ -749,6 +770,31 @@ class DocumentDataServiceTest {
         DocumentIdentifier documentIdentifier = DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY);
         assertThatThrownBy(() -> documentServiceImpl.updateContent(documentIdentifier, "edited by admin", clientHash))
                 .isInstanceOf(DocumentModifiedException.class)
+                .hasMessageContaining(SLOT_KEY);
+
+        verify(documentRepository, never()).save(any());
+        verifyNoInteractions(documentVersionRepository);
+    }
+
+    @Test
+    void shouldRejectUpdateContentWhenDocumentIsEncrypted() {
+        // given
+        DocumentSlotData slot = slot(ConflictStrategy.LAST_WRITE_WINS);
+        DocumentData existing = DocumentData.builder()
+                .id(UUID.randomUUID())
+                .documentSlotId(SLOT_ID)
+                .content(ENCRYPTED_CONTENT)
+                .contentHash(EXISTING_HASH)
+                .build();
+
+        when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY))
+                .thenReturn(Optional.of(slot));
+        when(documentRepository.findForUpdateByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.of(existing));
+
+        // when / then
+        DocumentIdentifier documentIdentifier = DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY);
+        assertThatThrownBy(() -> documentServiceImpl.updateContent(documentIdentifier, "edited by admin", EXISTING_HASH))
+                .isInstanceOf(EncryptedDocumentException.class)
                 .hasMessageContaining(SLOT_KEY);
 
         verify(documentRepository, never()).save(any());

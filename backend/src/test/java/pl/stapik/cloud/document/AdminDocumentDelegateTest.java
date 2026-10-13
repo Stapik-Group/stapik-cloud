@@ -31,6 +31,7 @@ class AdminDocumentDelegateTest extends AbstractIntegrationTest {
     private static final Instant DOCUMENT_UPDATED_AT = Instant.parse("2026-07-18T10:00:00Z");
     private static final String DOCUMENT_ETAG = "\"hash-initial\"";
     private static final String AUDIT_ACTION = "DOCUMENT_CONTENT_EDITED";
+    private static final String ENCRYPTED_CONTENT = "{\"format\":\"stapik-e2e\",\"version\":1}";
 
     @Autowired
     private MockMvc mockMvc;
@@ -168,8 +169,55 @@ class AdminDocumentDelegateTest extends AbstractIntegrationTest {
                 .andExpect(status().isNotFound());
     }
 
+    @Test
+    void shouldFlagDocumentAsNotEncrypted() throws Exception {
+        mockMvc.perform(get(DOCUMENT_URL, extensionId, SLOT_KEY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.encrypted").value(false));
+    }
+
+    @Test
+    void shouldFlagEncryptedDocumentAndRejectEditing() throws Exception {
+        // given
+        setContent(documentId, ENCRYPTED_CONTENT);
+
+        // when & then
+        mockMvc.perform(get(DOCUMENT_URL, extensionId, SLOT_KEY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.encrypted").value(true));
+
+        mockMvc.perform(put(DOCUMENT_URL, extensionId, SLOT_KEY)
+                        .header("If-Match", DOCUMENT_ETAG)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(writeRequestBody("edited")))
+                .andExpect(status().isConflict());
+
+        assertThat(readContent(documentId)).isEqualTo(ENCRYPTED_CONTENT);
+        assertThat(countVersions(documentId)).isZero();
+    }
+
+    @Test
+    void shouldRejectComparingEncryptedVersions() throws Exception {
+        // given
+        UUID fromId = insertVersion(documentId, ENCRYPTED_CONTENT);
+
+        // when & then
+        mockMvc.perform(get(DIFF_URL, extensionId, SLOT_KEY)
+                        .param("from", fromId.toString()))
+                .andExpect(status().isConflict());
+    }
+
     private String writeRequestBody(String escapedContent) {
         return "{\"content\": \"" + escapedContent + "\"}";
+    }
+
+    private void setContent(UUID id, String content) throws Exception {
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement statement = connection.prepareStatement("UPDATE document SET content = ? WHERE id = ?")) {
+            statement.setString(1, content);
+            statement.setObject(2, id);
+            statement.executeUpdate();
+        }
     }
 
     private String readContent(UUID id) throws Exception {

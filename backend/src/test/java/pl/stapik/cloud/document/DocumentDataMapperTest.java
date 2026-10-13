@@ -5,6 +5,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import pl.stapik.cloud.admin.data.AdminDocumentResponse;
 import pl.stapik.cloud.common.mapper.DateTimeMapperImpl;
 import pl.stapik.cloud.document.data.DocumentData;
 import pl.stapik.cloud.document.data.DocumentVersionData;
@@ -50,6 +51,29 @@ class DocumentDataMapperTest {
         assertThat(response.getContent()).isEqualTo("some content");
         assertThat(response.getContentHash()).isEqualTo("hash-123");
         assertThat(response.getUpdatedAt()).isEqualTo(updatedAt.atOffset(ZoneOffset.UTC));
+    }
+
+    @Test
+    void shouldFlagEncryptedContentInAdminResponse() {
+        // Given
+        DocumentData encrypted = DocumentData.builder()
+                .content("{\"format\":\"stapik-e2e\",\"version\":1}")
+                .contentHash("hash-1")
+                .updatedAt(Instant.parse("2026-07-18T10:00:00Z"))
+                .build();
+        DocumentData plain = DocumentData.builder()
+                .content("{\"foo\": \"bar\"}")
+                .contentHash("hash-2")
+                .updatedAt(Instant.parse("2026-07-18T10:00:00Z"))
+                .build();
+
+        // When
+        AdminDocumentResponse encryptedResponse = documentMapper.toAdminDocumentResponse(encrypted, "slot-key-1");
+        AdminDocumentResponse plainResponse = documentMapper.toAdminDocumentResponse(plain, "slot-key-1");
+
+        // Then
+        assertThat(encryptedResponse.getEncrypted()).isTrue();
+        assertThat(plainResponse.getEncrypted()).isFalse();
     }
 
     @Test

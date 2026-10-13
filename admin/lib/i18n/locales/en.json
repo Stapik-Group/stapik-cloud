@@ -96,6 +96,7 @@
   "documents.diffType.ADDED": "added",
   "documents.diffType.REMOVED": "removed",
   "documents.diffType.CHANGED": "changed",
+  "documents.encryptedNotice": "This document is end-to-end encrypted on the user's device. The server only sees an encrypted blob, so it cannot be edited and its versions cannot be compared.",
   "apiKeys.revokeConfirm": "Revoke this key? This cannot be undone.",
   "apiKeys.revoking": "...",
   "apiKeys.revokeButton": "Revoke"
