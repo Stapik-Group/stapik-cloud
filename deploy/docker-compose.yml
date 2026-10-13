@@ -63,7 +63,7 @@ services:
       retries: 5
       start_period: 60s
     ports:
-      - "127.0.0.1:8080:8080"
+      - "${APP_BIND_ADDRESS:-127.0.0.1}:8080:8080"
 
   admin:
     image: ${STAPIK_REGISTRY:-ghcr.io/stapik-group}/stapik-cloud-admin:${STAPIK_VERSION:-local}
