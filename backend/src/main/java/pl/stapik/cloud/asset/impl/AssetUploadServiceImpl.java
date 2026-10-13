@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pl.stapik.cloud.asset.AssetChecksumMismatchException;
+import pl.stapik.cloud.asset.AssetFilename;
 import pl.stapik.cloud.asset.AssetMimeTypePolicy;
 import pl.stapik.cloud.asset.AssetService;
 import pl.stapik.cloud.asset.AssetTooLargeException;
@@ -50,6 +51,7 @@ public class AssetUploadServiceImpl implements AssetUploadService {
     @Transactional
     @Override
     public AssetUploadResult start(UUID extensionId, StartAssetUpload command) {
+        String filename = AssetFilename.normalize(command.filename());
         DocumentSlotData slot = documentSlotRepository.findByExtensionIdAndSlotKey(extensionId, command.slotKey())
                 .orElseThrow(() -> new NoSuchElementException("Document slot not found: " + command.slotKey()));
 
@@ -60,7 +62,7 @@ public class AssetUploadServiceImpl implements AssetUploadService {
         Instant now = clock.instant();
         AssetUploadData upload = assetUploadRepository.save(AssetUploadData.builder()
                 .documentSlotId(slot.getId())
-                .filename(command.filename())
+                .filename(filename)
                 .mimeType(command.mimeType() != null ? command.mimeType() : DEFAULT_MIME_TYPE)
                 .sizeBytes(command.sizeBytes())
                 .expectedChecksumSha256(normalizeChecksum(command.checksumSha256()))
@@ -72,7 +74,7 @@ public class AssetUploadServiceImpl implements AssetUploadService {
         try {
             assetStorage.beginUpload(upload.getId(), extensionId, slot.getId(), upload.getFilename());
         } catch (IOException e) {
-            throw new UncheckedIOException("Failed to begin upload: " + command.filename(), e);
+            throw new UncheckedIOException("Failed to begin upload: " + filename, e);
         }
 
         return AssetUploadResult.inProgress(upload);

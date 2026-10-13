@@ -109,6 +109,20 @@ class AssetDataDelegateTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void shouldRejectReservedFilename() throws Exception {
+        // given
+        insertSlot(extensionId, "files", 1_048_576L);
+        MockMultipartFile file = new MockMultipartFile("file", "CON.txt", "text/plain", "hello".getBytes());
+
+        // when & then
+        mockMvc.perform(multipart("/api/v1/assets/{slotKey}/{filename}", "files", "CON.txt")
+                        .file(file)
+                        .header(API_KEY_HEADER, rawApiKey)
+                        .with(req -> { req.setMethod("PUT"); return req; }))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void shouldReturnNotFoundWhenUploadingToMissingSlot() throws Exception {
         // given
         MockMultipartFile file = new MockMultipartFile(
