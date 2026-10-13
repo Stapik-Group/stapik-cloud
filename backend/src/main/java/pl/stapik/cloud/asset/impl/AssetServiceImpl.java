@@ -3,6 +3,7 @@ package pl.stapik.cloud.asset.impl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import pl.stapik.cloud.asset.AssetMimeTypePolicy;
 import pl.stapik.cloud.asset.AssetRepository;
@@ -40,6 +41,7 @@ public class AssetServiceImpl implements AssetService {
         return assetRepository.findByDocumentSlotId(slot.getId());
     }
 
+    @Transactional
     @Override
     public AssetData upload(AssetIdentifier identifier, MultipartFile file, String expectedChecksumSha256) {
         DocumentSlotData slot = requireSlot(identifier.getExtensionId(), identifier.getSlotKey());
@@ -50,13 +52,14 @@ public class AssetServiceImpl implements AssetService {
 
         try {
             String mimeType = resolveMimeType(slot, identifier.getFilename(), file);
-            AssetStorage.StoredAsset stored = assetStorage.store(identifier.getExtensionId(), slot.getId(), identifier.getFilename(), file, expectedChecksumSha256);
-            return saveStoredAsset(slot, identifier.getFilename(), mimeType, stored);
+            AssetStorage.StagedAsset staged = assetStorage.stage(identifier.getExtensionId(), slot.getId(), identifier.getFilename(), file, expectedChecksumSha256);
+            return saveAndPromote(slot, identifier.getFilename(), mimeType, staged);
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to store asset: " + identifier.getFilename(), e);
         }
     }
 
+    @Transactional
     @Override
     public AssetData saveStoredAsset(DocumentSlotData slot, String filename, String mimeType, AssetStorage.StoredAsset stored) {
         AssetData assetData = assetRepository.findByDocumentSlotIdAndFilename(slot.getId(), filename)
@@ -72,7 +75,7 @@ public class AssetServiceImpl implements AssetService {
         assetData.setChecksumSha256(stored.checksumSha256());
         assetData.setUpdatedAt(Instant.now());
 
-        return assetRepository.save(assetData);
+        return assetRepository.saveAndFlush(assetData);
     }
 
     @Override
@@ -94,6 +97,17 @@ public class AssetServiceImpl implements AssetService {
             throw new UncheckedIOException("Failed to delete asset file: " + identifier.getFilename(), e);
         }
         assetRepository.delete(assetData);
+    }
+
+    private AssetData saveAndPromote(DocumentSlotData slot, String filename, String mimeType, AssetStorage.StagedAsset staged) throws IOException {
+        try {
+            AssetData assetData = saveStoredAsset(slot, filename, mimeType, staged.stored());
+            assetStorage.promote(staged);
+            return assetData;
+        } catch (IOException | RuntimeException e) {
+            assetStorage.discardStaged(staged);
+            throw e;
+        }
     }
 
     private String resolveMimeType(DocumentSlotData slot, String filename, MultipartFile file) throws IOException {

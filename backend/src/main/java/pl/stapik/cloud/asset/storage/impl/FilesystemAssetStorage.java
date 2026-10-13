@@ -38,7 +38,7 @@ public class FilesystemAssetStorage implements AssetStorage {
     }
 
     @Override
-    public StoredAsset store(UUID extensionId, UUID slotId, String filename, MultipartFile file, String expectedChecksumSha256) throws IOException {
+    public StagedAsset stage(UUID extensionId, UUID slotId, String filename, MultipartFile file, String expectedChecksumSha256) throws IOException {
         Path targetFile = resolveTargetFile(extensionId, slotId, filename);
         Path stagingFile = rootPath.resolve(UPLOADS_DIRECTORY).resolve(UUID.randomUUID() + PART_FILE_SUFFIX);
         Files.createDirectories(stagingFile.getParent());
@@ -56,13 +56,36 @@ public class FilesystemAssetStorage implements AssetStorage {
             String checksum = HexFormat.of().formatHex(digest.digest());
             requireMatchingChecksum(expectedChecksumSha256, checksum);
 
-            Files.createDirectories(targetFile.getParent());
-            Files.move(stagingFile, targetFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-
-            return new StoredAsset(rootPath.relativize(targetFile).toString(), checksum, sizeBytes);
-        } finally {
+            return stagedAsset(stagingFile, targetFile, checksum, sizeBytes);
+        } catch (IOException | RuntimeException e) {
             Files.deleteIfExists(stagingFile);
+            throw e;
         }
+    }
+
+    @Override
+    public StagedAsset stageUpload(UUID uploadId, UUID extensionId, UUID slotId, String filename, String expectedChecksumSha256) throws IOException {
+        Path partFile = resolvePartFile(uploadId);
+        Path targetFile = resolveTargetFile(extensionId, slotId, filename);
+
+        Fingerprint fingerprint = fingerprintOf(partFile);
+        requireMatchingChecksum(expectedChecksumSha256, fingerprint.checksumSha256());
+
+        return stagedAsset(partFile, targetFile, fingerprint.checksumSha256(), fingerprint.sizeBytes());
+    }
+
+    @Override
+    public void promote(StagedAsset staged) throws IOException {
+        Path stagingFile = resolveInsideRoot(staged.stagingPath());
+        Path targetFile = resolveInsideRoot(staged.stored().storagePath());
+
+        Files.createDirectories(targetFile.getParent());
+        Files.move(stagingFile, targetFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+    }
+
+    @Override
+    public void discardStaged(StagedAsset staged) throws IOException {
+        Files.deleteIfExists(resolveInsideRoot(staged.stagingPath()));
     }
 
     @Override
@@ -100,20 +123,6 @@ public class FilesystemAssetStorage implements AssetStorage {
     }
 
     @Override
-    public StoredAsset commitUpload(UUID uploadId, UUID extensionId, UUID slotId, String filename, String expectedChecksumSha256) throws IOException {
-        Path partFile = resolvePartFile(uploadId);
-        Path targetFile = resolveTargetFile(extensionId, slotId, filename);
-
-        Fingerprint fingerprint = fingerprintOf(partFile);
-        requireMatchingChecksum(expectedChecksumSha256, fingerprint.checksumSha256());
-
-        Files.createDirectories(targetFile.getParent());
-        Files.move(partFile, targetFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-
-        return new StoredAsset(rootPath.relativize(targetFile).toString(), fingerprint.checksumSha256(), fingerprint.sizeBytes());
-    }
-
-    @Override
     public void discardUpload(UUID uploadId) throws IOException {
         Files.deleteIfExists(resolvePartFile(uploadId));
     }
@@ -140,6 +149,19 @@ public class FilesystemAssetStorage implements AssetStorage {
             throw new IOException("Invalid filename (path traversal attempt): " + filename);
         }
         return targetFile;
+    }
+
+    private Path resolveInsideRoot(String storagePath) throws IOException {
+        Path file = rootPath.resolve(storagePath).normalize();
+        if (!file.startsWith(rootPath)) {
+            throw new IOException("Invalid storage path: " + storagePath);
+        }
+        return file;
+    }
+
+    private StagedAsset stagedAsset(Path stagingFile, Path targetFile, String checksum, long sizeBytes) {
+        StoredAsset stored = new StoredAsset(rootPath.relativize(targetFile).toString(), checksum, sizeBytes);
+        return new StagedAsset(stored, rootPath.relativize(stagingFile).toString());
     }
 
     private Path resolvePartFile(UUID uploadId) {

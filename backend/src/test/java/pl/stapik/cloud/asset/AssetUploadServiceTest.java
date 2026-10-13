@@ -155,7 +155,7 @@ class AssetUploadServiceTest {
         assertThat(result.asset()).isNull();
         assertThat(result.upload().getReceivedBytes()).isEqualTo(500L);
         assertThat(result.upload().getExpiresAt()).isEqualTo(NOW.plus(SESSION_TTL));
-        verify(assetStorage, never()).commitUpload(any(), any(), any(), any(), any());
+        verify(assetStorage, never()).stageUpload(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -193,7 +193,7 @@ class AssetUploadServiceTest {
         AssetStorage.StoredAsset stored = new AssetStorage.StoredAsset("path/video.bin", "abc", 1_000L);
         AssetData asset = AssetData.builder().filename(FILENAME).build();
         when(assetStorage.appendChunk(eq(UPLOAD_ID), eq(600L), any(), eq(400L))).thenReturn(400L);
-        when(assetStorage.commitUpload(UPLOAD_ID, EXTENSION_ID, SLOT_ID, FILENAME, "abc")).thenReturn(stored);
+        when(assetStorage.stageUpload(UPLOAD_ID, EXTENSION_ID, SLOT_ID, FILENAME, "abc")).thenReturn(new AssetStorage.StagedAsset(stored, ".uploads/x.part"));
         when(assetService.saveStoredAsset(any(DocumentSlotData.class), eq(FILENAME), eq("video/mp4"), eq(stored))).thenReturn(asset);
 
         // when
@@ -211,7 +211,7 @@ class AssetUploadServiceTest {
         AssetUploadData upload = upload(1_000L, 600L, "abc");
         givenUploadForUpdate(upload);
         when(assetStorage.appendChunk(eq(UPLOAD_ID), eq(600L), any(), eq(400L))).thenReturn(400L);
-        when(assetStorage.commitUpload(UPLOAD_ID, EXTENSION_ID, SLOT_ID, FILENAME, "abc"))
+        when(assetStorage.stageUpload(UPLOAD_ID, EXTENSION_ID, SLOT_ID, FILENAME, "abc"))
                 .thenThrow(new AssetChecksumMismatchException("abc", "def"));
 
         // when / then

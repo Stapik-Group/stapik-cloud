@@ -151,9 +151,10 @@ public class AssetUploadServiceImpl implements AssetUploadService {
         DocumentSlotData slot = context.slot();
 
         try {
-            AssetStorage.StoredAsset stored = assetStorage.commitUpload(
+            AssetStorage.StagedAsset staged = assetStorage.stageUpload(
                     upload.getId(), slot.getExtensionId(), slot.getId(), upload.getFilename(), upload.getExpectedChecksumSha256());
-            AssetData asset = assetService.saveStoredAsset(slot, upload.getFilename(), upload.getMimeType(), stored);
+            AssetData asset = assetService.saveStoredAsset(slot, upload.getFilename(), upload.getMimeType(), staged.stored());
+            assetStorage.promote(staged);
             assetUploadRepository.delete(upload);
             return asset;
         } catch (AssetChecksumMismatchException e) {

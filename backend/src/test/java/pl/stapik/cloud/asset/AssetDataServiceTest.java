@@ -104,9 +104,9 @@ class AssetDataServiceTest {
                 .thenReturn(Optional.of(slot));
         when(multipartFile.getSize()).thenReturn(2048L);
         when(assetMimeTypePolicy.resolve(any(), eq(FILENAME), any())).thenReturn("application/pdf");
-        when(assetStorage.store(EXTENSION_ID, SLOT_ID, FILENAME, multipartFile, null)).thenReturn(stored);
+        when(assetStorage.stage(EXTENSION_ID, SLOT_ID, FILENAME, multipartFile, null)).thenReturn(new AssetStorage.StagedAsset(stored, ".uploads/x.part"));
         when(assetRepository.findByDocumentSlotIdAndFilename(SLOT_ID, FILENAME)).thenReturn(Optional.empty());
-        when(assetRepository.save(any(AssetData.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(assetRepository.saveAndFlush(any(AssetData.class))).thenAnswer(inv -> inv.getArgument(0));
 
         // when
         AssetData result = assetServiceImpl.upload(AssetIdentifier.of(EXTENSION_ID, SLOT_KEY, FILENAME), multipartFile, null);
@@ -131,9 +131,9 @@ class AssetDataServiceTest {
         when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY))
                 .thenReturn(Optional.of(slot));
         when(multipartFile.getSize()).thenReturn(2048L);
-        when(assetStorage.store(EXTENSION_ID, SLOT_ID, FILENAME, multipartFile, null)).thenReturn(stored);
+        when(assetStorage.stage(EXTENSION_ID, SLOT_ID, FILENAME, multipartFile, null)).thenReturn(new AssetStorage.StagedAsset(stored, ".uploads/x.part"));
         when(assetRepository.findByDocumentSlotIdAndFilename(SLOT_ID, FILENAME)).thenReturn(Optional.empty());
-        when(assetRepository.save(any(AssetData.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(assetRepository.saveAndFlush(any(AssetData.class))).thenAnswer(inv -> inv.getArgument(0));
 
         // when
         AssetData result = assetServiceImpl.upload(AssetIdentifier.of(EXTENSION_ID, SLOT_KEY, FILENAME), multipartFile, null);
@@ -166,9 +166,9 @@ class AssetDataServiceTest {
                 .thenReturn(Optional.of(slot));
         when(multipartFile.getSize()).thenReturn(4096L);
         when(assetMimeTypePolicy.resolve(any(), eq(FILENAME), any())).thenReturn("application/pdf");
-        when(assetStorage.store(EXTENSION_ID, SLOT_ID, FILENAME, multipartFile, null)).thenReturn(stored);
+        when(assetStorage.stage(EXTENSION_ID, SLOT_ID, FILENAME, multipartFile, null)).thenReturn(new AssetStorage.StagedAsset(stored, ".uploads/x.part"));
         when(assetRepository.findByDocumentSlotIdAndFilename(SLOT_ID, FILENAME)).thenReturn(Optional.of(existing));
-        when(assetRepository.save(any(AssetData.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(assetRepository.saveAndFlush(any(AssetData.class))).thenAnswer(inv -> inv.getArgument(0));
 
         // when
         AssetData result = assetServiceImpl.upload(AssetIdentifier.of(EXTENSION_ID, SLOT_KEY, FILENAME), multipartFile, null);
@@ -198,7 +198,7 @@ class AssetDataServiceTest {
                 .hasMessageContaining("1000");
 
         verifyNoInteractions(assetStorage);
-        verify(assetRepository, never()).save(any());
+        verify(assetRepository, never()).saveAndFlush(any());
     }
 
     @Test
@@ -208,7 +208,7 @@ class AssetDataServiceTest {
         when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY))
                 .thenReturn(Optional.of(slot));
         when(multipartFile.getSize()).thenReturn(2048L);
-        when(assetStorage.store(EXTENSION_ID, SLOT_ID, FILENAME, multipartFile, null))
+        when(assetStorage.stage(EXTENSION_ID, SLOT_ID, FILENAME, multipartFile, null))
                 .thenThrow(new IOException("disk full"));
 
         // when / then
@@ -219,7 +219,31 @@ class AssetDataServiceTest {
                 .cause()
                 .hasMessageContaining("disk full");
 
-        verify(assetRepository, never()).save(any());
+        verify(assetRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void shouldDiscardStagedFileWhenDatabaseSaveFails() throws IOException {
+        // given
+        DocumentSlotData slot = slot(1_048_576L);
+        AssetStorage.StagedAsset staged = new AssetStorage.StagedAsset(
+                new AssetStorage.StoredAsset("path/" + FILENAME, "hash123", 2048L), ".uploads/x.part");
+
+        when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY))
+                .thenReturn(Optional.of(slot));
+        when(multipartFile.getSize()).thenReturn(2048L);
+        when(assetMimeTypePolicy.resolve(any(), eq(FILENAME), any())).thenReturn("application/pdf");
+        when(assetStorage.stage(EXTENSION_ID, SLOT_ID, FILENAME, multipartFile, null)).thenReturn(staged);
+        when(assetRepository.findByDocumentSlotIdAndFilename(SLOT_ID, FILENAME)).thenReturn(Optional.empty());
+        when(assetRepository.saveAndFlush(any(AssetData.class))).thenThrow(new IllegalStateException("db down"));
+
+        // when / then
+        AssetIdentifier assetIdentifier = AssetIdentifier.of(EXTENSION_ID, SLOT_KEY, FILENAME);
+        assertThatThrownBy(() -> assetServiceImpl.upload(assetIdentifier, multipartFile, null))
+                .isInstanceOf(IllegalStateException.class);
+
+        verify(assetStorage).discardStaged(staged);
+        verify(assetStorage, never()).promote(any());
     }
 
     @Test
