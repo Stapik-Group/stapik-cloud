@@ -29,6 +29,7 @@ public interface DocumentMapper {
     DocumentResponse toResponse(DocumentData document, String slotKey);
     @Mapping(target = "slotKey", source = "slotKey")
     @Mapping(target = "updatedAt", source = "document.updatedAt")
+    @Mapping(target = "encrypted", source = "document.content", qualifiedByName = "isEncrypted")
     AdminDocumentResponse toAdminDocumentResponse(DocumentData document, String slotKey);
     DocumentVersionResponse toVersionResponse(DocumentVersionData version);
     @Mapping(target = "partition", source = "partitionKey")
@@ -39,6 +40,10 @@ public interface DocumentMapper {
     @Named("partitionOrNull")
     default String partitionOrNull(String partitionKey) {
         return DocumentData.DEFAULT_PARTITION_KEY.equals(partitionKey) ? null : partitionKey;
+    }
+    @Named("isEncrypted")
+    default boolean isEncrypted(String content) {
+        return EncryptedDocumentContent.isEncrypted(content);
     }
     AdminDocumentVersionListResponseVersionsInner toAdminVersionResponse(DocumentVersionData documentVersionData);
     AdminDocumentDiffResponse toAdminDiffResponse(DocumentComparison comparison);

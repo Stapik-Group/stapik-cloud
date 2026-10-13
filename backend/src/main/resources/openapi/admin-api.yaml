@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Stapik Cloud - Admin API
-  version: 1.0.4
+  version: 1.0.5
   description: >
     Admin panel API (React) - login, extension wizard, slot/key management, document
     browser, audit log. Authentication: JWT (Bearer), fully separated from client
@@ -345,7 +345,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          description: If-Match is missing or does not match the current document ETag
+          description: If-Match is missing or does not match the current document ETag, or the document is end-to-end encrypted
 
   /extensions/{extensionId}/documents/{slotKey}/versions:
     get:
@@ -392,6 +392,8 @@ paths:
                 $ref: '#/components/schemas/AdminDocumentDiffResponse'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          description: One of the compared versions is end-to-end encrypted
 
   /extensions/{extensionId}/documents/{slotKey}/versions/{versionId}/restore:
     post:
@@ -686,7 +688,7 @@ components:
 
     AdminDocumentResponse:
       type: object
-      required: [slotKey, content, contentHash, updatedAt]
+      required: [slotKey, content, contentHash, updatedAt, encrypted]
       properties:
         slotKey:
           type: string
@@ -697,6 +699,11 @@ components:
         updatedAt:
           type: string
           format: date-time
+        encrypted:
+          type: boolean
+          description: >
+            The content is an end-to-end encrypted envelope produced by the client. The server cannot read, edit or
+            compare it.
 
     AdminDocumentWriteRequest:
       type: object
