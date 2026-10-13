@@ -11,6 +11,7 @@ A self-hosted backend for the Stapik ecosystem of apps — document storage with
 - **Binary assets** — file upload/download/list per document slot, backed by local filesystem storage; large files can be sent in resumable chunks (`/asset-uploads`) instead of a single multipart request
 - **API key authentication** — per-extension API keys (Argon2id-hashed, prefix lookup, read-only/read-write scopes) for app-facing endpoints
 - **Admin panel** — Next.js interface (JWT-secured) to manage extensions, document slots, API keys, browse document content and version history, and inspect the audit log
+- **Two-factor authentication (optional)** — TOTP (Google Authenticator, Aegis, any RFC 6238 app) with one-time backup codes; works fully offline, the secret never leaves the server except at enrollment
 - **Audit log** — tracks administrative actions (extension/slot/key lifecycle) with a paginated, filterable view
 - **Multilingual admin UI** — Polish, English and German interface with instant switching
 - **OpenAPI-first** — two specs, one for app-facing endpoints (`x-api-key`), one for the admin panel (JWT), both used to generate server and client types
@@ -69,6 +70,18 @@ Both share a common error schema (`common/error.yaml`, RFC 7807 structured error
 ## Configuration
 
 The backend is configured entirely through environment variables — see [`deploy/.env.example`](deploy/.env.example) for the full list (database credentials, JWT secret, admin bootstrap account, admin panel CORS origin, audit log retention).
+
+## Two-factor authentication
+
+Every admin can enable TOTP on the *My account* page: scan the QR code, confirm with a code, store the backup codes. Verification is local (HMAC over the shared secret and the clock), so neither the server nor the phone needs internet access, only a reasonably accurate clock on both. The issuer shown in the authenticator app defaults to `Stapik Cloud` and can be changed with `STAPIK_CLOUD_SECURITY_TOTP_ISSUER`.
+
+A locked-out admin can be reset by an `OWNER` on the *Administrators* page. If no owner can sign in, run the backend once with the CLI option, which resets the account and exits:
+
+```bash
+java -jar stapik-cloud.jar --reset-two-factor=<username> --spring.main.web-application-type=none
+```
+
+Resetting clears the secret and backup codes and signs the account out everywhere.
 
 ## TODO
 
