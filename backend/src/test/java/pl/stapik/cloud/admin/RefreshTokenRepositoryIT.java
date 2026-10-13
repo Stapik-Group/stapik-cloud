@@ -30,6 +30,7 @@ class RefreshTokenRepositoryIT extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        refreshTokenRepository.deleteAll();
         adminUser = createAdminUser("refresh-token-user");
     }
 

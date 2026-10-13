@@ -1,5 +1,6 @@
 package pl.stapik.cloud.audit;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -23,6 +24,11 @@ class AuditLogRepositoryIT extends AbstractIntegrationTest {
 
     @Autowired
     private ExtensionRepository extensionRepository;
+
+    @BeforeEach
+    void clearAuditLog() {
+        auditLogRepository.deleteAll();
+    }
 
     @Test
     void shouldFindByExtensionIdOrderByOccurredAtDesc() {
