@@ -15,6 +15,12 @@ const contentSecurityPolicy = [
     "frame-ancestors 'none'",
 ].join("; ");
 
+const assetPreviewContentSecurityPolicy = [
+    "default-src 'none'",
+    "object-src 'self'",
+    "frame-ancestors 'self'",
+].join("; ");
+
 const nextConfig: NextConfig = {
     output: "standalone",
     devIndicators: false,
@@ -27,6 +33,10 @@ const nextConfig: NextConfig = {
                     { key: "X-Content-Type-Options", value: "nosniff" },
                     { key: "Referrer-Policy", value: "no-referrer" },
                 ],
+            },
+            {
+                source: "/api/extensions/:extensionId/assets/:slotKey/:filename",
+                headers: [{ key: "Content-Security-Policy", value: assetPreviewContentSecurityPolicy }],
             },
         ];
     },

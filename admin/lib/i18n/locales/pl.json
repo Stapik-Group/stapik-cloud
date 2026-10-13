@@ -191,5 +191,17 @@
   "adminUsers.role": "Rola",
   "adminUsers.create": "Utwórz konto",
   "adminUsers.createError": "Nie udało się utworzyć konta.",
-  "adminUsers.usernameTaken": "Ta nazwa użytkownika jest już zajęta."
+  "adminUsers.usernameTaken": "Ta nazwa użytkownika jest już zajęta.",
+  "assets.fetchError": "Nie udało się pobrać listy plików.",
+  "assets.empty": "Brak plików.",
+  "assets.upload": "Prześlij plik",
+  "assets.uploading": "Przesyłanie...",
+  "assets.uploadError": "Nie udało się przesłać pliku (HTTP {status}).",
+  "assets.tooLarge": "Plik przekracza limit panelu: {limit}. Większe pliki prześlij przez API.",
+  "assets.overwriteConfirm": "Plik „{filename}” już istnieje. Nadpisać?",
+  "assets.deleteConfirm": "Usunąć plik „{filename}”? Tej operacji nie można cofnąć.",
+  "assets.deleteError": "Nie udało się usunąć pliku (HTTP {status}).",
+  "assets.preview": "Podgląd",
+  "assets.closePreview": "Zamknij podgląd",
+  "assets.download": "Pobierz"
 }

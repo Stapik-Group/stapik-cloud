@@ -191,5 +191,17 @@
   "adminUsers.role": "Rolle",
   "adminUsers.create": "Konto erstellen",
   "adminUsers.createError": "Das Konto konnte nicht erstellt werden.",
-  "adminUsers.usernameTaken": "Dieser Benutzername ist bereits vergeben."
+  "adminUsers.usernameTaken": "Dieser Benutzername ist bereits vergeben.",
+  "assets.fetchError": "Dateiliste konnte nicht abgerufen werden.",
+  "assets.empty": "Keine Dateien.",
+  "assets.upload": "Datei hochladen",
+  "assets.uploading": "Wird hochgeladen...",
+  "assets.uploadError": "Datei konnte nicht hochgeladen werden (HTTP {status}).",
+  "assets.tooLarge": "Die Datei überschreitet das Limit des Panels von {limit}. Größere Dateien über die API hochladen.",
+  "assets.overwriteConfirm": "\"{filename}\" existiert bereits. Überschreiben?",
+  "assets.deleteConfirm": "\"{filename}\" löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
+  "assets.deleteError": "Datei konnte nicht gelöscht werden (HTTP {status}).",
+  "assets.preview": "Vorschau",
+  "assets.closePreview": "Vorschau schließen",
+  "assets.download": "Herunterladen"
 }

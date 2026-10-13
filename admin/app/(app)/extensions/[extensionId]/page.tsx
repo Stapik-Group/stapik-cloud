@@ -118,7 +118,11 @@ export default async function ExtensionDetailPage({
                                 className="panel flex items-center justify-between hover:border-primary transition-colors"
                             >
                                 <Link
-                                    href={`/extensions/${extensionId}/documents/${slot.slotKey}`}
+                                    href={
+                                        slot.contentType === "BINARY" || slot.contentType === "BINARY_COLLECTION"
+                                            ? `/extensions/${extensionId}/assets/${slot.slotKey}`
+                                            : `/extensions/${extensionId}/documents/${slot.slotKey}`
+                                    }
                                     className="flex-1"
                                 >
                                     <p className="font-medium">{slot.slotKey}</p>

@@ -79,6 +79,11 @@ public class AssetServiceImpl implements AssetService {
     }
 
     @Override
+    public AssetData getMetadata(AssetIdentifier identifier) {
+        return requireAsset(identifier);
+    }
+
+    @Override
     public Resource download(AssetIdentifier identifier) {
         AssetData assetData = requireAsset(identifier);
         try {

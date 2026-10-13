@@ -191,5 +191,17 @@
   "adminUsers.role": "Role",
   "adminUsers.create": "Create account",
   "adminUsers.createError": "Failed to create the account.",
-  "adminUsers.usernameTaken": "This username is already taken."
+  "adminUsers.usernameTaken": "This username is already taken.",
+  "assets.fetchError": "Failed to fetch the list of files.",
+  "assets.empty": "No files.",
+  "assets.upload": "Upload file",
+  "assets.uploading": "Uploading...",
+  "assets.uploadError": "Failed to upload the file (HTTP {status}).",
+  "assets.tooLarge": "The file exceeds the panel limit of {limit}. Upload larger files through the API.",
+  "assets.overwriteConfirm": "\"{filename}\" already exists. Overwrite it?",
+  "assets.deleteConfirm": "Delete \"{filename}\"? This action cannot be undone.",
+  "assets.deleteError": "Failed to delete the file (HTTP {status}).",
+  "assets.preview": "Preview",
+  "assets.closePreview": "Close preview",
+  "assets.download": "Download"
 }

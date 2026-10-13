@@ -11,6 +11,7 @@ import java.util.List;
 
 public interface AssetService {
     List<AssetData> list(AssetIdentifier identifier);
+    AssetData getMetadata(AssetIdentifier identifier);
     AssetData upload(AssetIdentifier identifier, MultipartFile file, String expectedChecksumSha256);
     AssetData saveStoredAsset(DocumentSlotData slot, String filename, String mimeType, AssetStorage.StoredAsset stored);
     Resource download(AssetIdentifier identifier);

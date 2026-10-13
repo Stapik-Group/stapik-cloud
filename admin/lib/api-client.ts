@@ -14,7 +14,9 @@ export async function adminApiFetch(path: string, init: RequestInit = {}): Promi
     const token = await getAuthToken();
 
     const headers = new Headers(init.headers);
-    headers.set("Content-Type", "application/json");
+    if (!(init.body instanceof FormData)) {
+        headers.set("Content-Type", "application/json");
+    }
     if (token) {
         headers.set("Authorization", `Bearer ${token}`);
     }

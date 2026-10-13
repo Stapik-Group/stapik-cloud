@@ -21,6 +21,7 @@ tags:
   - name: slots
   - name: keys
   - name: admin-documents
+  - name: admin-assets
   - name: audit-log
   - name: dashboard
 
@@ -764,6 +765,113 @@ paths:
               schema:
                 $ref: '#/components/schemas/AdminDocumentResponse'
 
+  /extensions/{extensionId}/assets/{slotKey}:
+    get:
+      operationId: listAdminAssets
+      tags: [admin-assets]
+      summary: List the files stored in a slot
+      parameters:
+        - $ref: '#/components/parameters/ExtensionIdParam'
+        - $ref: '#/components/parameters/SlotKeyPathParam'
+      responses:
+        '200':
+          description: Files of the slot, sorted by filename
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminAssetListResponse'
+        '404':
+          description: Slot not found
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+
+  /extensions/{extensionId}/assets/{slotKey}/{filename}:
+    get:
+      operationId: downloadAdminAsset
+      tags: [admin-assets]
+      summary: Download a file, or fetch it for inline preview
+      parameters:
+        - $ref: '#/components/parameters/ExtensionIdParam'
+        - $ref: '#/components/parameters/SlotKeyPathParam'
+        - $ref: '#/components/parameters/FilenamePathParam'
+        - name: inline
+          in: query
+          description: Serve the file inline with its real content type. Honoured only for previewable types; any other file is always sent as an attachment.
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: File content (streamed)
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Slot or file not found
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+    put:
+      operationId: uploadAdminAsset
+      tags: [admin-assets]
+      summary: Upload or overwrite a file
+      parameters:
+        - $ref: '#/components/parameters/ExtensionIdParam'
+        - $ref: '#/components/parameters/SlotKeyPathParam'
+        - $ref: '#/components/parameters/FilenamePathParam'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminAssetResponse'
+        '404':
+          description: Slot not found
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+        '413':
+          description: Maximum file size of the slot exceeded
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+    delete:
+      operationId: deleteAdminAsset
+      tags: [admin-assets]
+      summary: Delete a file
+      parameters:
+        - $ref: '#/components/parameters/ExtensionIdParam'
+        - $ref: '#/components/parameters/SlotKeyPathParam'
+        - $ref: '#/components/parameters/FilenamePathParam'
+      responses:
+        '204':
+          description: Deleted
+        '404':
+          description: Slot or file not found
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+
   /audit-log:
     get:
       operationId: listAuditLog
@@ -858,6 +966,12 @@ components:
         format: uuid
     SlotKeyPathParam:
       name: slotKey
+      in: path
+      required: true
+      schema:
+        type: string
+    FilenamePathParam:
+      name: filename
       in: path
       required: true
       schema:
@@ -1344,6 +1458,35 @@ components:
         after:
           type: string
           description: JSON-encoded value in the second version; absent for REMOVED.
+
+    AdminAssetResponse:
+      type: object
+      required: [filename, mimeType, sizeBytes, checksumSha256, updatedAt, previewable]
+      properties:
+        filename:
+          type: string
+        mimeType:
+          type: string
+        sizeBytes:
+          type: integer
+          format: int64
+        checksumSha256:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+        previewable:
+          type: boolean
+          description: Whether the file can be displayed inline (images and PDF).
+
+    AdminAssetListResponse:
+      type: object
+      required: [assets]
+      properties:
+        assets:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminAssetResponse'
 
     AuditLogEntryResponse:
       type: object
