@@ -149,5 +149,14 @@
   "account.sessionSignOut": "Wyloguj",
   "account.sessionsRevokeOthers": "Wyloguj wszystkie pozostałe sesje",
   "account.sessionsRevokeOthersConfirm": "Wylogować wszystkie pozostałe sesje?",
-  "account.sessionsError": "Nie udało się wylogować sesji."
+  "account.sessionsError": "Nie udało się wylogować sesji.",
+  "account.passwordTitle": "Hasło",
+  "account.currentPassword": "Obecne hasło",
+  "account.newPassword": "Nowe hasło",
+  "account.confirmNewPassword": "Powtórz nowe hasło",
+  "account.passwordHint": "Minimum {min} znaków. Zmiana hasła wylogowuje wszystkie pozostałe sesje.",
+  "account.changePassword": "Zmień hasło",
+  "account.passwordMismatch": "Hasła nie są takie same.",
+  "account.passwordChanged": "Hasło zostało zmienione.",
+  "account.passwordChangeError": "Nie udało się zmienić hasła. Sprawdź obecne hasło."
 }

@@ -3,6 +3,7 @@ import { adminApiFetch } from "@/lib/api-client";
 import type { components } from "@/lib/api-types";
 import { getLocale } from "@/lib/i18n/locale-cookie";
 import { translate } from "@/lib/i18n/translations";
+import { ChangePasswordForm } from "@/components/ChangePasswordForm";
 import { SessionsList } from "@/components/SessionsList";
 import { TwoFactorManage } from "@/components/TwoFactorManage";
 import { TwoFactorSetup } from "@/components/TwoFactorSetup";
@@ -43,6 +44,11 @@ export default async function AccountPage() {
                     {account.username} · {account.role}
                 </p>
             </div>
+
+            <section className="space-y-3">
+                <h2 className="font-medium">{t("account.passwordTitle")}</h2>
+                <ChangePasswordForm />
+            </section>
 
             <section className="space-y-3">
                 <h2 className="font-medium">{t("account.twoFactorTitle")}</h2>

@@ -149,5 +149,14 @@
   "account.sessionSignOut": "Sign out",
   "account.sessionsRevokeOthers": "Sign out all other sessions",
   "account.sessionsRevokeOthersConfirm": "Sign out all other sessions?",
-  "account.sessionsError": "Failed to sign out the session."
+  "account.sessionsError": "Failed to sign out the session.",
+  "account.passwordTitle": "Password",
+  "account.currentPassword": "Current password",
+  "account.newPassword": "New password",
+  "account.confirmNewPassword": "Repeat new password",
+  "account.passwordHint": "At least {min} characters. Changing the password signs out all other sessions.",
+  "account.changePassword": "Change password",
+  "account.passwordMismatch": "The passwords do not match.",
+  "account.passwordChanged": "Password changed.",
+  "account.passwordChangeError": "Failed to change the password. Check the current password."
 }

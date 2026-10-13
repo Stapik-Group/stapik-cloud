@@ -13,4 +13,6 @@ public interface AdminUserService {
     Optional<AdminUserData> findById(UUID adminUserId);
 
     List<AdminUserData> findAll();
+
+    void changePassword(UUID adminUserId, UUID currentSessionId, String currentPassword, String newPassword);
 }

@@ -265,6 +265,27 @@ paths:
               schema:
                 $ref: 'common/error.yaml#/components/schemas/Problem'
 
+  /account/password:
+    post:
+      operationId: changePassword
+      tags: [account]
+      summary: Change the password of the signed-in admin and sign out all other sessions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+      responses:
+        '204':
+          description: Password changed
+        '400':
+          description: Wrong current password or the new password is too short
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+
   /account/sessions:
     get:
       operationId: listSessions
@@ -813,6 +834,18 @@ components:
         backupCodesRemaining:
           type: integer
           format: int64
+
+    ChangePasswordRequest:
+      type: object
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword:
+          type: string
+          minLength: 1
+        newPassword:
+          type: string
+          minLength: 12
+          maxLength: 128
 
     SessionResponse:
       type: object

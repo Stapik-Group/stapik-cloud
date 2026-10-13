@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 import pl.stapik.cloud.admin.api.AccountApiDelegate;
 import pl.stapik.cloud.admin.data.AccountResponse;
 import pl.stapik.cloud.admin.data.BackupCodesResponse;
+import pl.stapik.cloud.admin.data.ChangePasswordRequest;
 import pl.stapik.cloud.admin.data.SessionListResponse;
 import pl.stapik.cloud.admin.data.SessionResponse;
 import pl.stapik.cloud.admin.data.TwoFactorConfirmationRequest;
@@ -25,6 +26,7 @@ public class AdminAccountDelegate implements AccountApiDelegate {
 
     private final AdminTwoFactorService adminTwoFactorService;
     private final AdminSessionService adminSessionService;
+    private final AdminUserService adminUserService;
     private final CurrentAdmin currentAdmin;
 
     @Override
@@ -63,6 +65,13 @@ public class AdminAccountDelegate implements AccountApiDelegate {
         return ResponseEntity.ok(new BackupCodesResponse()
                 .backupCodes(adminTwoFactorService.regenerateBackupCodes(
                         currentAdmin.id(), request.getPassword(), request.getCode())));
+    }
+
+    @Override
+    public ResponseEntity<Void> changePassword(ChangePasswordRequest request) {
+        adminUserService.changePassword(
+                currentAdmin.id(), currentAdmin.sessionId(), request.getCurrentPassword(), request.getNewPassword());
+        return ResponseEntity.noContent().build();
     }
 
     @Override

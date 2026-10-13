@@ -149,5 +149,14 @@
   "account.sessionSignOut": "Abmelden",
   "account.sessionsRevokeOthers": "Alle anderen Sitzungen abmelden",
   "account.sessionsRevokeOthersConfirm": "Alle anderen Sitzungen abmelden?",
-  "account.sessionsError": "Die Sitzung konnte nicht abgemeldet werden."
+  "account.sessionsError": "Die Sitzung konnte nicht abgemeldet werden.",
+  "account.passwordTitle": "Passwort",
+  "account.currentPassword": "Aktuelles Passwort",
+  "account.newPassword": "Neues Passwort",
+  "account.confirmNewPassword": "Neues Passwort wiederholen",
+  "account.passwordHint": "Mindestens {min} Zeichen. Eine Änderung meldet alle anderen Sitzungen ab.",
+  "account.changePassword": "Passwort ändern",
+  "account.passwordMismatch": "Die Passwörter stimmen nicht überein.",
+  "account.passwordChanged": "Passwort geändert.",
+  "account.passwordChangeError": "Das Passwort konnte nicht geändert werden. Prüfen Sie das aktuelle Passwort."
 }

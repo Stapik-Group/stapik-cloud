@@ -10,6 +10,7 @@ import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
+import pl.stapik.cloud.admin.PasswordVerificationException;
 import pl.stapik.cloud.admin.TwoFactorStateException;
 import pl.stapik.cloud.admin.TwoFactorVerificationException;
 import pl.stapik.cloud.security.ratelimit.TooManyRequestsException;
@@ -68,6 +69,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
         problem.setTitle("Verification failed");
         problem.setType(URI.create("urn:error:auth:two-factor-verification"));
+        return problem;
+    }
+
+    @ExceptionHandler(PasswordVerificationException.class)
+    public ProblemDetail handlePasswordVerification(PasswordVerificationException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        problem.setTitle("Verification failed");
+        problem.setType(URI.create("urn:error:auth:password-verification"));
         return problem;
     }
 
