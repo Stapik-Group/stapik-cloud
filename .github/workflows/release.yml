@@ -34,6 +34,31 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Build backend image for scanning
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          load: true
+          tags: stapik-cloud-backend:scan
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,scope=backend,mode=max
+      - name: Build admin image for scanning
+        uses: docker/build-push-action@v6
+        with:
+          context: admin
+          build-contexts: openapi=backend/src/main/resources/openapi
+          load: true
+          tags: stapik-cloud-admin:scan
+          cache-from: type=gha,scope=admin
+          cache-to: type=gha,scope=admin,mode=max
+      - name: Scan images with Trivy
+        run: |
+          for image in backend admin; do
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.58.1 image \
+              --severity HIGH,CRITICAL --ignore-unfixed --pkg-types os,library --exit-code 1 \
+              "stapik-cloud-${image}:scan"
+          done
+
       - name: Image tags (backend)
         id: meta-backend
         uses: docker/metadata-action@v5
