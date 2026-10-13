@@ -1,11 +1,12 @@
 openapi: 3.0.3
 info:
   title: Stapik Cloud - Application API
-  version: 1.0.2
+  version: 1.0.3
   description: >
     API used by Stapik ecosystem client applications (desktop C++/GTK4, Android) to
     sync documents and binary assets. Authentication: x-api-key header, a key is
-    assigned 1:1 to a single Extension and a single device.
+    assigned 1:1 to a single Extension and a single device. Responses to requests made with a key that
+    expires soon carry the X-Api-Key-Expires-At header (ISO-8601 instant).
 
 servers:
   - url: /api/v1

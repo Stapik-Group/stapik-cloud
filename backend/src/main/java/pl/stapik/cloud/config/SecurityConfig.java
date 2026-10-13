@@ -15,6 +15,7 @@ import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.servlet.HandlerExceptionResolver;
+import pl.stapik.cloud.apikey.ApiKeyProperties;
 import pl.stapik.cloud.apikey.ApiKeyRepository;
 import pl.stapik.cloud.common.crypto.ApiKeyHasher;
 import pl.stapik.cloud.extension.ExtensionRepository;
@@ -26,6 +27,8 @@ import pl.stapik.cloud.security.ratelimit.ApiKeyRateLimitFilter;
 import pl.stapik.cloud.security.ratelimit.KeyedRateLimiter;
 import pl.stapik.cloud.security.ratelimit.LoginRateLimitFilter;
 import pl.stapik.cloud.security.ratelimit.RateLimitProperties;
+
+import java.time.Clock;
 
 @Configuration
 @EnableWebSecurity
@@ -42,10 +45,13 @@ public class SecurityConfig {
                           ApiKeyRepository apiKeyRepository,
                           ExtensionRepository extensionRepository,
                           ApiKeyHasher apiKeyHasher,
+                          ApiKeyProperties apiKeyProperties,
+                          Clock clock,
                           JwtService jwtService,
                           RateLimitProperties rateLimitProperties) {
         this.exceptionResolver = exceptionResolver;
-        this.apiKeyAuthenticationFilter = new ApiKeyAuthenticationFilter(apiKeyRepository, extensionRepository, apiKeyHasher);
+        this.apiKeyAuthenticationFilter = new ApiKeyAuthenticationFilter(
+                apiKeyRepository, extensionRepository, apiKeyHasher, apiKeyProperties, clock);
         this.jwtAuthenticationFilter = new JwtAuthenticationFilter(jwtService);
         this.apiKeyRateLimitFilter = new ApiKeyRateLimitFilter(
                 new KeyedRateLimiter(rateLimitProperties.apiKey().requestsPerMinute()), exceptionResolver);
