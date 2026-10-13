@@ -4,6 +4,7 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingConstants;
 import org.mapstruct.Named;
+import pl.stapik.cloud.admin.data.AdminDocumentDiffResponse;
 import pl.stapik.cloud.admin.data.AdminDocumentResponse;
 import pl.stapik.cloud.admin.data.AdminDocumentVersionListResponseVersionsInner;
 import pl.stapik.cloud.common.mapper.DateTimeMapper;
@@ -11,6 +12,7 @@ import pl.stapik.cloud.common.mapper.JsonNullableMapper;
 import pl.stapik.cloud.document.data.DocumentData;
 import pl.stapik.cloud.document.data.DocumentVersionData;
 import pl.stapik.cloud.document.dto.DocumentChangeSummary;
+import pl.stapik.cloud.document.dto.DocumentComparison;
 import pl.stapik.cloud.document.dto.DocumentPartitionSummary;
 import pl.stapik.cloud.internal.data.DocumentChangeResponse;
 import pl.stapik.cloud.internal.data.DocumentPartitionResponse;
@@ -39,4 +41,5 @@ public interface DocumentMapper {
         return DocumentData.DEFAULT_PARTITION_KEY.equals(partitionKey) ? null : partitionKey;
     }
     AdminDocumentVersionListResponseVersionsInner toAdminVersionResponse(DocumentVersionData documentVersionData);
+    AdminDocumentDiffResponse toAdminDiffResponse(DocumentComparison comparison);
 }

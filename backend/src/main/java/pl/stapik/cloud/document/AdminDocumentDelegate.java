@@ -4,11 +4,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import pl.stapik.cloud.admin.api.AdminDocumentsApiDelegate;
+import pl.stapik.cloud.admin.data.AdminDocumentDiffResponse;
 import pl.stapik.cloud.admin.data.AdminDocumentResponse;
 import pl.stapik.cloud.admin.data.AdminDocumentVersionListResponse;
 import pl.stapik.cloud.admin.data.AdminDocumentVersionListResponseVersionsInner;
 import pl.stapik.cloud.admin.data.AdminDocumentWriteRequest;
 import pl.stapik.cloud.document.data.DocumentData;
+import pl.stapik.cloud.document.dto.DocumentComparison;
 import pl.stapik.cloud.document.dto.DocumentIdentifier;
 import pl.stapik.cloud.document.dto.DocumentWriter;
 
@@ -45,6 +47,12 @@ public class AdminDocumentDelegate implements AdminDocumentsApiDelegate {
                 .toList();
 
         return ResponseEntity.ok(new AdminDocumentVersionListResponse().versions(versions));
+    }
+
+    @Override
+    public ResponseEntity<AdminDocumentDiffResponse> compareDocumentVersionsAdmin(UUID extensionId, String slotKey, UUID from, UUID to) {
+        DocumentComparison comparison = documentService.compareVersions(DocumentIdentifier.of(extensionId, slotKey), from, to);
+        return ResponseEntity.ok(documentMapper.toAdminDiffResponse(comparison));
     }
 
     @Override

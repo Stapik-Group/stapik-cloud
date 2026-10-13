@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -26,6 +27,7 @@ class AdminDocumentDelegateTest extends AbstractIntegrationTest {
 
     private static final String SLOT_KEY = "calendar.json";
     private static final String DOCUMENT_URL = "/api/admin/extensions/{extensionId}/documents/{slotKey}";
+    private static final String DIFF_URL = DOCUMENT_URL + "/versions/diff";
     private static final Instant DOCUMENT_UPDATED_AT = Instant.parse("2026-07-18T10:00:00Z");
     private static final String DOCUMENT_ETAG = "\"hash-initial\"";
     private static final String AUDIT_ACTION = "DOCUMENT_CONTENT_EDITED";
@@ -52,8 +54,8 @@ class AdminDocumentDelegateTest extends AbstractIntegrationTest {
         extensionId = UUID.randomUUID();
         insertExtension(extensionId);
         UUID slotId = UUID.randomUUID();
-        insertDocumentSlot(slotId, extensionId, SLOT_KEY);
-        documentId = insertDocument(slotId, "{\"foo\": \"bar\"}");
+        insertDocumentSlot(slotId, extensionId);
+        documentId = insertDocument(slotId);
     }
 
     @Test
@@ -73,7 +75,7 @@ class AdminDocumentDelegateTest extends AbstractIntegrationTest {
 
         assertThat(readContent(documentId)).isEqualTo("{\"foo\": \"edited\"}");
         assertThat(countVersions(documentId)).isEqualTo(1);
-        assertThat(countAuditEntries(AUDIT_ACTION)).isEqualTo(1);
+        assertThat(countAuditEntries()).isEqualTo(1);
     }
 
     @Test
@@ -90,7 +92,7 @@ class AdminDocumentDelegateTest extends AbstractIntegrationTest {
 
         assertThat(readContent(documentId)).isEqualTo("{\"foo\": \"bar\"}");
         assertThat(countVersions(documentId)).isZero();
-        assertThat(countAuditEntries(AUDIT_ACTION)).isZero();
+        assertThat(countAuditEntries()).isZero();
     }
 
     @Test
@@ -120,6 +122,52 @@ class AdminDocumentDelegateTest extends AbstractIntegrationTest {
         assertThat(readContent(documentId)).isEqualTo("{\"foo\": \"bar\"}");
     }
 
+    @Test
+    void shouldCompareTwoVersions() throws Exception {
+        // given
+        UUID fromId = insertVersion(documentId, "{\"foo\": \"bar\", \"gone\": 1}");
+        UUID toId = insertVersion(documentId, "{\"foo\": \"baz\", \"new\": 2}");
+
+        // when & then
+        mockMvc.perform(get(DIFF_URL, extensionId, SLOT_KEY)
+                        .param("from", fromId.toString())
+                        .param("to", toId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.from.versionId").value(fromId.toString()))
+                .andExpect(jsonPath("$.to.versionId").value(toId.toString()))
+                .andExpect(jsonPath("$.from.content").value("{\"foo\": \"bar\", \"gone\": 1}"))
+                .andExpect(jsonPath("$.changes.length()").value(3))
+                .andExpect(jsonPath("$.changes[0].path").value("/foo"))
+                .andExpect(jsonPath("$.changes[0].type").value("CHANGED"))
+                .andExpect(jsonPath("$.changes[1].path").value("/gone"))
+                .andExpect(jsonPath("$.changes[1].type").value("REMOVED"))
+                .andExpect(jsonPath("$.changes[2].path").value("/new"))
+                .andExpect(jsonPath("$.changes[2].type").value("ADDED"));
+    }
+
+    @Test
+    void shouldCompareVersionWithCurrentDocumentWhenToIsOmitted() throws Exception {
+        // given
+        UUID fromId = insertVersion(documentId, "{\"foo\": \"old\"}");
+
+        // when & then
+        mockMvc.perform(get(DIFF_URL, extensionId, SLOT_KEY)
+                        .param("from", fromId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.to.versionId").doesNotExist())
+                .andExpect(jsonPath("$.to.content").value("{\"foo\": \"bar\"}"))
+                .andExpect(jsonPath("$.changes[0].path").value("/foo"))
+                .andExpect(jsonPath("$.changes[0].before").value("\"old\""))
+                .andExpect(jsonPath("$.changes[0].after").value("\"bar\""));
+    }
+
+    @Test
+    void shouldReturnNotFoundWhenComparedVersionDoesNotExist() throws Exception {
+        mockMvc.perform(get(DIFF_URL, extensionId, SLOT_KEY)
+                        .param("from", UUID.randomUUID().toString()))
+                .andExpect(status().isNotFound());
+    }
+
     private String writeRequestBody(String escapedContent) {
         return "{\"content\": \"" + escapedContent + "\"}";
     }
@@ -146,15 +194,31 @@ class AdminDocumentDelegateTest extends AbstractIntegrationTest {
         }
     }
 
-    private int countAuditEntries(String action) throws Exception {
+    private int countAuditEntries() throws Exception {
         try (Connection connection = dataSource.getConnection();
              PreparedStatement statement = connection.prepareStatement("SELECT count(*) FROM audit_log_entry WHERE action = ?")) {
-            statement.setString(1, action);
+            statement.setString(1, AdminDocumentDelegateTest.AUDIT_ACTION);
             try (ResultSet resultSet = statement.executeQuery()) {
                 resultSet.next();
                 return resultSet.getInt(1);
             }
         }
+    }
+
+    private UUID insertVersion(UUID documentId, String content) throws Exception {
+        UUID id = UUID.randomUUID();
+        try (Connection connection = dataSource.getConnection()) {
+            String sql = "INSERT INTO document_version (id, document_id, content, saved_at, reason) VALUES (?, ?, ?, ?, ?)";
+            try (PreparedStatement ps = connection.prepareStatement(sql)) {
+                ps.setObject(1, id);
+                ps.setObject(2, documentId);
+                ps.setString(3, content);
+                ps.setTimestamp(4, java.sql.Timestamp.from(DOCUMENT_UPDATED_AT));
+                ps.setString(5, "NORMAL_WRITE");
+                ps.executeUpdate();
+            }
+        }
+        return id;
     }
 
     private void insertExtension(UUID id) throws Exception {
@@ -171,7 +235,7 @@ class AdminDocumentDelegateTest extends AbstractIntegrationTest {
         }
     }
 
-    private void insertDocumentSlot(UUID id, UUID extensionId, String slotKey) throws Exception {
+    private void insertDocumentSlot(UUID id, UUID extensionId) throws Exception {
         try (Connection connection = dataSource.getConnection()) {
             String sql = "INSERT INTO document_slot (id, extension_id, slot_key, content_type, max_size_bytes, " +
                     "versioning_enabled, max_versions_retained, conflict_strategy, created_at) " +
@@ -179,7 +243,7 @@ class AdminDocumentDelegateTest extends AbstractIntegrationTest {
             try (PreparedStatement ps = connection.prepareStatement(sql)) {
                 ps.setObject(1, id);
                 ps.setObject(2, extensionId);
-                ps.setString(3, slotKey);
+                ps.setString(3, AdminDocumentDelegateTest.SLOT_KEY);
                 ps.setString(4, "JSON");
                 ps.setLong(5, 1_048_576L);
                 ps.setBoolean(6, true);
@@ -191,14 +255,14 @@ class AdminDocumentDelegateTest extends AbstractIntegrationTest {
         }
     }
 
-    private UUID insertDocument(UUID slotId, String content) throws Exception {
+    private UUID insertDocument(UUID slotId) throws Exception {
         UUID id = UUID.randomUUID();
         try (Connection connection = dataSource.getConnection()) {
             String sql = "INSERT INTO document (id, document_slot_id, content, content_hash, updated_at) VALUES (?, ?, ?, ?, ?)";
             try (PreparedStatement ps = connection.prepareStatement(sql)) {
                 ps.setObject(1, id);
                 ps.setObject(2, slotId);
-                ps.setString(3, content);
+                ps.setString(3, "{\"foo\": \"bar\"}");
                 ps.setString(4, "hash-initial");
                 ps.setTimestamp(5, java.sql.Timestamp.from(DOCUMENT_UPDATED_AT));
                 ps.executeUpdate();

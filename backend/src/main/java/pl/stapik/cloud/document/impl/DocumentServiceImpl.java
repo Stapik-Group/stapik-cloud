@@ -14,9 +14,12 @@ import pl.stapik.cloud.document.conflict.ConflictResolver;
 import pl.stapik.cloud.document.data.DocumentData;
 import pl.stapik.cloud.document.data.DocumentVersionData;
 import pl.stapik.cloud.document.data.VersionReason;
+import pl.stapik.cloud.document.diff.JsonDiffer;
 import pl.stapik.cloud.document.dto.DocumentChangeSummary;
+import pl.stapik.cloud.document.dto.DocumentComparison;
 import pl.stapik.cloud.document.dto.DocumentIdentifier;
 import pl.stapik.cloud.document.dto.DocumentPartitionSummary;
+import pl.stapik.cloud.document.dto.DocumentSnapshot;
 import pl.stapik.cloud.document.dto.DocumentWriter;
 import pl.stapik.cloud.document.dto.WriteResult;
 import pl.stapik.cloud.documentslot.data.ConflictStrategy;
@@ -53,6 +56,19 @@ public class DocumentServiceImpl implements DocumentService {
         DocumentSlotData slot = requireSlot(identifier);
         DocumentData documentData = requireCurrentDocument(slot, identifier);
         return documentVersionRepository.findByDocumentIdOrderBySavedAtDesc(documentData.getId());
+    }
+
+    @Override
+    public DocumentComparison compareVersions(DocumentIdentifier identifier, UUID fromVersionId, UUID toVersionId) {
+        DocumentSlotData slot = requireSlot(identifier);
+        DocumentData documentData = requireCurrentDocument(slot, identifier);
+
+        DocumentSnapshot from = DocumentSnapshot.ofVersion(requireVersion(documentData, fromVersionId));
+        DocumentSnapshot to = toVersionId == null
+                ? DocumentSnapshot.ofCurrent(documentData)
+                : DocumentSnapshot.ofVersion(requireVersion(documentData, toVersionId));
+
+        return new DocumentComparison(from, to, JsonDiffer.diff(from.content(), to.content()));
     }
 
     @Transactional
@@ -99,9 +115,7 @@ public class DocumentServiceImpl implements DocumentService {
         DocumentSlotData slot = requireSlot(identifier);
         DocumentData documentData = requireCurrentDocumentForUpdate(slot, identifier);
 
-        DocumentVersionData version = documentVersionRepository.findById(versionId)
-                .filter(v -> v.getDocumentId().equals(documentData.getId()))
-                .orElseThrow(() -> new NoSuchElementException("Version not found: " + versionId));
+        DocumentVersionData version = requireVersion(documentData, versionId);
 
         DocumentData saved = applyContent(documentData, version.getContent());
         saveVersion(slot, saved.getId(), version.getContent(), VersionReason.MANUAL_RESTORE, writer);
@@ -188,6 +202,12 @@ public class DocumentServiceImpl implements DocumentService {
 
         documentVersionRepository.save(version);
         documentVersionRepository.deleteAllExceptNewest(documentId, slot.getMaxVersionsRetained());
+    }
+
+    private DocumentVersionData requireVersion(DocumentData documentData, UUID versionId) {
+        return documentVersionRepository.findById(versionId)
+                .filter(version -> version.getDocumentId().equals(documentData.getId()))
+                .orElseThrow(() -> new NoSuchElementException("Version not found: " + versionId));
     }
 
     private DocumentData requireCurrentDocument(DocumentSlotData slot, DocumentIdentifier identifier) {
