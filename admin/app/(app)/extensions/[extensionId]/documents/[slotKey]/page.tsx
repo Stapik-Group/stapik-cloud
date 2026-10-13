@@ -4,6 +4,7 @@ import { adminApiFetch } from "@/lib/api-client";
 import { DownloadDocumentButton } from "@/components/DownloadDocumentButton";
 import { JsonDocumentEditor } from "@/components/JsonDocumentEditor";
 import { RestoreVersionButton } from "@/components/RestoreVersionButton";
+import { VersionDiff } from "@/components/VersionDiff";
 import type { components } from "@/lib/api-types";
 
 import { getLocale } from "@/lib/i18n/locale-cookie";
@@ -59,6 +60,10 @@ export default async function DocumentBrowserPage({ params, }: {
     const slotsData: DocumentSlotListResponse = await slotsRes.json();
     const slot = (slotsData.slots ?? []).find((slotEntry) => slotEntry.slotKey === slotKey);
     const isJsonEditable = slot?.contentType === "JSON";
+    const versionOptions = versions.map((version) => ({
+        id: version.id,
+        label: `${new Date(version.savedAt).toLocaleString(locale)} · ${t(REASON_KEYS[version.reason])}`,
+    }));
     const downloadMimeType = slot?.contentType === "JSON" ? "application/json" : "text/plain";
 
     return (
@@ -136,6 +141,13 @@ export default async function DocumentBrowserPage({ params, }: {
                     </div>
                 )}
             </section>
+
+            {isJsonEditable && versions.length > 0 && (
+                <section className="space-y-2">
+                    <h2 className="font-medium">{t("documents.diffTitle")}</h2>
+                    <VersionDiff extensionId={extensionId} slotKey={slotKey} versions={versionOptions} />
+                </section>
+            )}
         </main>
     );
 }

@@ -13,6 +13,9 @@ import pl.stapik.cloud.document.data.DocumentData;
 import pl.stapik.cloud.document.data.DocumentVersionData;
 import pl.stapik.cloud.document.data.VersionReason;
 import pl.stapik.cloud.document.dto.DocumentChangeSummary;
+import pl.stapik.cloud.document.diff.ChangeType;
+import pl.stapik.cloud.document.diff.JsonChange;
+import pl.stapik.cloud.document.dto.DocumentComparison;
 import pl.stapik.cloud.document.dto.DocumentIdentifier;
 import pl.stapik.cloud.document.dto.DocumentWriter;
 import pl.stapik.cloud.document.dto.DocumentPartitionSummary;
@@ -409,6 +412,77 @@ class DocumentDataServiceTest {
                 v.getReason() == VersionReason.MANUAL_RESTORE
                         && v.getContent().equals("restored content")
         ));
+    }
+
+    @Test
+    void shouldCompareTwoVersions() {
+        // given
+        DocumentSlotData slot = slot(ConflictStrategy.LAST_WRITE_WINS);
+        UUID documentId = UUID.randomUUID();
+        DocumentData documentData = DocumentData.builder().id(documentId).documentSlotId(SLOT_ID).content("{\"a\": 3}").build();
+        UUID fromId = UUID.randomUUID();
+        UUID toId = UUID.randomUUID();
+        Instant fromSavedAt = Instant.parse("2026-07-18T10:00:00Z");
+
+        when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY)).thenReturn(Optional.of(slot));
+        when(documentRepository.findByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.of(documentData));
+        when(documentVersionRepository.findById(fromId)).thenReturn(Optional.of(
+                DocumentVersionData.builder().id(fromId).documentId(documentId).content("{\"a\": 1}").savedAt(fromSavedAt).build()));
+        when(documentVersionRepository.findById(toId)).thenReturn(Optional.of(
+                DocumentVersionData.builder().id(toId).documentId(documentId).content("{\"a\": 2}").build()));
+
+        // when
+        DocumentComparison result = documentServiceImpl.compareVersions(DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), fromId, toId);
+
+        // then
+        assertThat(result.from().versionId()).isEqualTo(fromId);
+        assertThat(result.from().savedAt()).isEqualTo(fromSavedAt);
+        assertThat(result.to().versionId()).isEqualTo(toId);
+        assertThat(result.changes()).containsExactly(new JsonChange("/a", ChangeType.CHANGED, "1", "2"));
+    }
+
+    @Test
+    void shouldCompareVersionWithCurrentDocumentWhenTargetVersionIsMissing() {
+        // given
+        DocumentSlotData slot = slot(ConflictStrategy.LAST_WRITE_WINS);
+        UUID documentId = UUID.randomUUID();
+        Instant updatedAt = Instant.parse("2026-07-19T10:00:00Z");
+        DocumentData documentData = DocumentData.builder()
+                .id(documentId).documentSlotId(SLOT_ID).content("{\"a\": 2}").updatedAt(updatedAt).build();
+        UUID fromId = UUID.randomUUID();
+
+        when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY)).thenReturn(Optional.of(slot));
+        when(documentRepository.findByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.of(documentData));
+        when(documentVersionRepository.findById(fromId)).thenReturn(Optional.of(
+                DocumentVersionData.builder().id(fromId).documentId(documentId).content("{\"a\": 1}").build()));
+
+        // when
+        DocumentComparison result = documentServiceImpl.compareVersions(DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY), fromId, null);
+
+        // then
+        assertThat(result.to().versionId()).isNull();
+        assertThat(result.to().savedAt()).isEqualTo(updatedAt);
+        assertThat(result.to().content()).isEqualTo("{\"a\": 2}");
+        assertThat(result.changes()).containsExactly(new JsonChange("/a", ChangeType.CHANGED, "1", "2"));
+    }
+
+    @Test
+    void shouldThrowWhenVersionBelongsToAnotherDocumentOnCompare() {
+        // given
+        DocumentSlotData slot = slot(ConflictStrategy.LAST_WRITE_WINS);
+        DocumentData documentData = DocumentData.builder().id(UUID.randomUUID()).documentSlotId(SLOT_ID).build();
+        UUID versionId = UUID.randomUUID();
+
+        when(documentSlotRepository.findByExtensionIdAndSlotKey(EXTENSION_ID, SLOT_KEY)).thenReturn(Optional.of(slot));
+        when(documentRepository.findByDocumentSlotIdAndPartitionKey(SLOT_ID, DocumentData.DEFAULT_PARTITION_KEY)).thenReturn(Optional.of(documentData));
+        when(documentVersionRepository.findById(versionId)).thenReturn(Optional.of(
+                DocumentVersionData.builder().id(versionId).documentId(UUID.randomUUID()).build()));
+
+        // when / then
+        DocumentIdentifier documentIdentifier = DocumentIdentifier.of(EXTENSION_ID, SLOT_KEY);
+        assertThatThrownBy(() -> documentServiceImpl.compareVersions(documentIdentifier, versionId, null))
+                .isInstanceOf(NoSuchElementException.class)
+                .hasMessageContaining(versionId.toString());
     }
 
     @Test

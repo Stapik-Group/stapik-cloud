@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Stapik Cloud - Admin API
-  version: 1.0.3
+  version: 1.0.4
   description: >
     Admin panel API (React) - login, extension wizard, slot/key management, document
     browser, audit log. Authentication: JWT (Bearer), fully separated from client
@@ -363,6 +363,36 @@ paths:
               schema:
                 $ref: '#/components/schemas/AdminDocumentVersionListResponse'
 
+  /extensions/{extensionId}/documents/{slotKey}/versions/diff:
+    get:
+      operationId: compareDocumentVersionsAdmin
+      tags: [admin-documents]
+      summary: Compare two versions of a document (the second defaults to the current content)
+      parameters:
+        - $ref: '#/components/parameters/ExtensionIdParam'
+        - $ref: '#/components/parameters/SlotKeyPathParam'
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: to
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Both sides with their content and the structural JSON changes between them
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminDocumentDiffResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /extensions/{extensionId}/documents/{slotKey}/versions/{versionId}/restore:
     post:
       operationId: restoreDocumentVersionAdmin
@@ -700,6 +730,50 @@ components:
               deviceLabel:
                 type: string
                 description: Label of that device's API key at the time of writing.
+
+    AdminDocumentDiffResponse:
+      type: object
+      required: [from, to, changes]
+      properties:
+        from:
+          $ref: '#/components/schemas/AdminDocumentDiffSide'
+        to:
+          $ref: '#/components/schemas/AdminDocumentDiffSide'
+        changes:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminDocumentDiffChange'
+
+    AdminDocumentDiffSide:
+      type: object
+      required: [savedAt, content]
+      properties:
+        versionId:
+          type: string
+          format: uuid
+          description: Absent when this side is the current document content.
+        savedAt:
+          type: string
+          format: date-time
+        content:
+          type: string
+
+    AdminDocumentDiffChange:
+      type: object
+      required: [path, type]
+      properties:
+        path:
+          type: string
+          description: JSON Pointer (RFC 6901) to the changed value; empty for the document root.
+        type:
+          type: string
+          enum: [ADDED, REMOVED, CHANGED]
+        before:
+          type: string
+          description: JSON-encoded value in the first version; absent for ADDED.
+        after:
+          type: string
+          description: JSON-encoded value in the second version; absent for REMOVED.
 
     AuditLogEntryResponse:
       type: object
