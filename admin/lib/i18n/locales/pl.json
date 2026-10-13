@@ -203,5 +203,7 @@
   "assets.deleteError": "Nie udało się usunąć pliku (HTTP {status}).",
   "assets.preview": "Podgląd",
   "assets.closePreview": "Zamknij podgląd",
-  "assets.download": "Pobierz"
+  "assets.download": "Pobierz",
+  "documents.mainDocument": "Dokument główny",
+  "documents.noMainDocument": "Ten slot nie ma jeszcze dokumentu głównego — wybierz partycję."
 }

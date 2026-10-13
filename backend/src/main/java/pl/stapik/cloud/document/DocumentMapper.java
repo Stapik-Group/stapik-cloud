@@ -5,6 +5,7 @@ import org.mapstruct.Mapping;
 import org.mapstruct.MappingConstants;
 import org.mapstruct.Named;
 import pl.stapik.cloud.admin.data.AdminDocumentDiffResponse;
+import pl.stapik.cloud.admin.data.AdminDocumentPartitionResponse;
 import pl.stapik.cloud.admin.data.AdminDocumentResponse;
 import pl.stapik.cloud.admin.data.AdminDocumentVersionListResponseVersionsInner;
 import pl.stapik.cloud.common.mapper.DateTimeMapper;
@@ -34,6 +35,8 @@ public interface DocumentMapper {
     DocumentVersionResponse toVersionResponse(DocumentVersionData version);
     @Mapping(target = "partition", source = "partitionKey")
     DocumentPartitionResponse toPartitionResponse(DocumentPartitionSummary summary);
+    @Mapping(target = "partition", source = "partitionKey")
+    AdminDocumentPartitionResponse toAdminPartitionResponse(DocumentPartitionSummary summary);
     @Mapping(target = "partition", source = "partitionKey", qualifiedByName = "partitionOrNull")
     @Mapping(target = "deleted", expression = "java(change.getDeletedAt() != null)")
     DocumentChangeResponse toChangeResponse(DocumentChangeSummary change);

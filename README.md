@@ -10,7 +10,7 @@ A self-hosted backend for the Stapik ecosystem of apps — document storage with
 - **Version history** — every write is recorded; restore any previous version as the current document, or compare two versions with a structural JSON diff
 - **Binary assets** — file upload/download/list per document slot, backed by local filesystem storage; large files can be sent in resumable chunks (`/asset-uploads`) instead of a single multipart request
 - **API key authentication** — per-extension API keys (Argon2id-hashed, prefix lookup, read-only/read-write scopes) for app-facing endpoints
-- **Admin panel** — Next.js interface (JWT-secured) to manage extensions, document slots, API keys, browse document content and version history, see usage statistics on the dashboard, manage binary assets, and inspect the audit log
+- **Admin panel** — Next.js interface (JWT-secured) to manage extensions, document slots, API keys, browse document content, partitions and version history, see usage statistics on the dashboard, manage binary assets, and inspect the audit log
 - **Two-factor authentication (optional)** — TOTP (Google Authenticator, Aegis, any RFC 6238 app) with one-time backup codes; works fully offline, the secret never leaves the server except at enrollment
 - **Audit log** — tracks administrative actions (extension/slot/key lifecycle) with a paginated, filterable view
 - **Multilingual admin UI** — Polish, English and German interface with instant switching

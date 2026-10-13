@@ -44,6 +44,7 @@ class AdminDocumentDelegateTest extends AbstractIntegrationTest {
     private ContentEncryptor contentEncryptor;
 
     private UUID extensionId;
+    private UUID slotId;
     private UUID documentId;
 
     @BeforeEach
@@ -58,7 +59,7 @@ class AdminDocumentDelegateTest extends AbstractIntegrationTest {
 
         extensionId = UUID.randomUUID();
         insertExtension(extensionId);
-        UUID slotId = UUID.randomUUID();
+        slotId = UUID.randomUUID();
         insertDocumentSlot(slotId, extensionId);
         documentId = insertDocument(slotId);
     }
@@ -125,6 +126,65 @@ class AdminDocumentDelegateTest extends AbstractIntegrationTest {
                 .andExpect(status().isConflict());
 
         assertThat(readContent(documentId)).isEqualTo("{\"foo\": \"bar\"}");
+    }
+
+    @Test
+    void shouldListPartitionsSortedByKeyWithoutTheMainDocument() throws Exception {
+        // given
+        insertDocument(slotId, "2026", "{}", "hash-2026");
+        insertDocument(slotId, "2025", "{}", "hash-2025");
+
+        // when & then
+        mockMvc.perform(get(DOCUMENT_URL + "/partitions", extensionId, SLOT_KEY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.partitions.length()").value(2))
+                .andExpect(jsonPath("$.partitions[0].partition").value("2025"))
+                .andExpect(jsonPath("$.partitions[1].partition").value("2026"));
+    }
+
+    @Test
+    void shouldReadPartitionSeparatelyFromMainDocument() throws Exception {
+        // given
+        insertDocument(slotId, "2025", "{\"year\": 2025}", "hash-2025");
+
+        // when & then
+        mockMvc.perform(get(DOCUMENT_URL, extensionId, SLOT_KEY).param("partition", "2025"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("ETag", "\"hash-2025\""))
+                .andExpect(jsonPath("$.content").value("{\"year\": 2025}"));
+        mockMvc.perform(get(DOCUMENT_URL, extensionId, SLOT_KEY))
+                .andExpect(jsonPath("$.content").value("{\"foo\": \"bar\"}"));
+    }
+
+    @Test
+    void shouldUpdateOnlyTheRequestedPartition() throws Exception {
+        // given
+        UUID partitionId = insertDocument(slotId, "2025", "{}", "hash-2025");
+
+        // when & then
+        mockMvc.perform(put(DOCUMENT_URL, extensionId, SLOT_KEY)
+                        .param("partition", "2025")
+                        .header("If-Match", "\"hash-2025\"")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(writeRequestBody("{\\\"year\\\": 2025}")))
+                .andExpect(status().isOk());
+
+        assertThat(readContent(partitionId)).isEqualTo("{\"year\": 2025}");
+        assertThat(readContent(documentId)).isEqualTo("{\"foo\": \"bar\"}");
+    }
+
+    @Test
+    void shouldReturnNotFoundForMissingPartition() throws Exception {
+        // when & then
+        mockMvc.perform(get(DOCUMENT_URL, extensionId, SLOT_KEY).param("partition", "2099"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldRejectInvalidPartitionKey() throws Exception {
+        // when & then
+        mockMvc.perform(get(DOCUMENT_URL, extensionId, SLOT_KEY).param("partition", "../etc"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -308,15 +368,20 @@ class AdminDocumentDelegateTest extends AbstractIntegrationTest {
     }
 
     private UUID insertDocument(UUID slotId) throws Exception {
+        return insertDocument(slotId, "", "{\"foo\": \"bar\"}", "hash-initial");
+    }
+
+    private UUID insertDocument(UUID slotId, String partitionKey, String content, String contentHash) throws Exception {
         UUID id = UUID.randomUUID();
         try (Connection connection = dataSource.getConnection()) {
-            String sql = "INSERT INTO document (id, document_slot_id, content, content_hash, updated_at) VALUES (?, ?, ?, ?, ?)";
+            String sql = "INSERT INTO document (id, document_slot_id, partition_key, content, content_hash, updated_at) VALUES (?, ?, ?, ?, ?, ?)";
             try (PreparedStatement ps = connection.prepareStatement(sql)) {
                 ps.setObject(1, id);
                 ps.setObject(2, slotId);
-                ps.setString(3, "{\"foo\": \"bar\"}");
-                ps.setString(4, "hash-initial");
-                ps.setTimestamp(5, java.sql.Timestamp.from(DOCUMENT_UPDATED_AT));
+                ps.setString(3, partitionKey);
+                ps.setString(4, content);
+                ps.setString(5, contentHash);
+                ps.setTimestamp(6, java.sql.Timestamp.from(DOCUMENT_UPDATED_AT));
                 ps.executeUpdate();
             }
         }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { documentApiUrl } from "@/lib/document-api-url";
 import { useTranslation } from "@/lib/i18n/LocaleProvider";
 import type { components } from "@/lib/api-types";
 
@@ -9,10 +10,12 @@ type AdminDocumentResponse = components["schemas"]["AdminDocumentResponse"];
 export function DownloadDocumentButton({
                                            extensionId,
                                            slotKey,
+                                           partition,
                                            mimeType,
                                        }: {
     extensionId: string;
     slotKey: string;
+    partition?: string;
     mimeType: string;
 }) {
     const { t } = useTranslation();
@@ -24,7 +27,7 @@ export function DownloadDocumentButton({
         setIsDownloading(true);
 
         try {
-            const response = await fetch(`/api/extensions/${extensionId}/documents/${slotKey}`);
+            const response = await fetch(documentApiUrl(extensionId, slotKey, "", partition));
             if (!response.ok) {
                 setError(t("documents.downloadError", { status: response.status }));
                 return;
@@ -36,7 +39,7 @@ export function DownloadDocumentButton({
 
             const downloadLink = window.document.createElement("a");
             downloadLink.href = fileUrl;
-            downloadLink.download = slotKey;
+            downloadLink.download = partition ? `${slotKey}-${partition}` : slotKey;
             window.document.body.appendChild(downloadLink);
             downloadLink.click();
             downloadLink.remove();

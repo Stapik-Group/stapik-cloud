@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { documentApiUrl } from "@/lib/document-api-url";
 import { useTranslation } from "@/lib/i18n/LocaleProvider";
 import { formatForEditing } from "@/lib/json-format";
 import type { components } from "@/lib/api-types";
@@ -25,10 +26,12 @@ export type VersionOption = {
 export function VersionDiff({
                                 extensionId,
                                 slotKey,
+                                partition,
                                 versions,
                             }: {
     extensionId: string;
     slotKey: string;
+    partition?: string;
     versions: VersionOption[];
 }) {
     const { t } = useTranslation();
@@ -48,9 +51,7 @@ export function VersionDiff({
                 query.set("to", toVersionId);
             }
 
-            const response = await fetch(
-                `/api/extensions/${extensionId}/documents/${slotKey}/versions/diff?${query}`,
-            );
+            const response = await fetch(documentApiUrl(extensionId, slotKey, "/versions/diff", partition, query));
 
             if (!response.ok) {
                 setDiff(null);

@@ -203,5 +203,7 @@
   "assets.deleteError": "Datei konnte nicht gelöscht werden (HTTP {status}).",
   "assets.preview": "Vorschau",
   "assets.closePreview": "Vorschau schließen",
-  "assets.download": "Herunterladen"
+  "assets.download": "Herunterladen",
+  "documents.mainDocument": "Hauptdokument",
+  "documents.noMainDocument": "Dieser Slot hat noch kein Hauptdokument — wähle eine Partition."
 }

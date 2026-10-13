@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminApiFetch } from "@/lib/api-client";
 
 export async function POST(
-    _request: NextRequest,
+    request: NextRequest,
     {
         params,
     }: {
@@ -12,7 +12,7 @@ export async function POST(
     const { extensionId, slotKey, versionId } = await params;
 
     const backendResponse = await adminApiFetch(
-        `/api/admin/extensions/${extensionId}/documents/${slotKey}/versions/${versionId}/restore`,
+        `/api/admin/extensions/${extensionId}/documents/${slotKey}/versions/${versionId}/restore${request.nextUrl.search}`,
         { method: "POST" },
     );
 

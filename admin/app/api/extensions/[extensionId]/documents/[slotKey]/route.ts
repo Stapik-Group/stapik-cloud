@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminApiFetch } from "@/lib/api-client";
 
 export async function GET(
-    _request: NextRequest,
+    request: NextRequest,
     { params }: { params: Promise<{ extensionId: string; slotKey: string }> },
 ) {
     const { extensionId, slotKey } = await params;
 
     const backendResponse = await adminApiFetch(
-        `/api/admin/extensions/${extensionId}/documents/${slotKey}`,
+        `/api/admin/extensions/${extensionId}/documents/${slotKey}${request.nextUrl.search}`,
     );
 
     const data = await backendResponse.json();
@@ -24,7 +24,7 @@ export async function PUT(
     const ifMatch = request.headers.get("If-Match");
 
     const backendResponse = await adminApiFetch(
-        `/api/admin/extensions/${extensionId}/documents/${slotKey}`,
+        `/api/admin/extensions/${extensionId}/documents/${slotKey}${request.nextUrl.search}`,
         {
             method: "PUT",
             body: JSON.stringify(body),

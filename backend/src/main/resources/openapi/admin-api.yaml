@@ -645,6 +645,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/ExtensionIdParam'
         - $ref: '#/components/parameters/SlotKeyPathParam'
+        - $ref: '#/components/parameters/PartitionQueryParam'
       responses:
         '200':
           description: Document content
@@ -665,6 +666,7 @@ paths:
         - $ref: '#/components/parameters/ExtensionIdParam'
         - $ref: '#/components/parameters/SlotKeyPathParam'
         - $ref: '#/components/parameters/IfMatchParam'
+        - $ref: '#/components/parameters/PartitionQueryParam'
       requestBody:
         required: true
         content:
@@ -700,6 +702,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/ExtensionIdParam'
         - $ref: '#/components/parameters/SlotKeyPathParam'
+        - $ref: '#/components/parameters/PartitionQueryParam'
       responses:
         '200':
           description: List of versions
@@ -728,6 +731,7 @@ paths:
           schema:
             type: string
             format: uuid
+        - $ref: '#/components/parameters/PartitionQueryParam'
       responses:
         '200':
           description: Both sides with their content and the structural JSON changes between them
@@ -754,6 +758,7 @@ paths:
           schema:
             type: string
             format: uuid
+        - $ref: '#/components/parameters/PartitionQueryParam'
       responses:
         '200':
           description: Restored
@@ -764,6 +769,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AdminDocumentResponse'
+
+  /extensions/{extensionId}/documents/{slotKey}/partitions:
+    get:
+      operationId: listDocumentPartitionsAdmin
+      tags: [admin-documents]
+      summary: List the named partitions of a document slot
+      parameters:
+        - $ref: '#/components/parameters/ExtensionIdParam'
+        - $ref: '#/components/parameters/SlotKeyPathParam'
+      responses:
+        '200':
+          description: Existing partitions, sorted by key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminDocumentPartitionListResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   /extensions/{extensionId}/assets/{slotKey}:
     get:
@@ -928,6 +951,13 @@ components:
         type: string
 
   parameters:
+    PartitionQueryParam:
+      name: partition
+      in: query
+      required: false
+      description: Named partition of the slot. The main document when omitted.
+      schema:
+        type: string
     IfMatchParam:
       name: If-Match
       in: header
@@ -1458,6 +1488,28 @@ components:
         after:
           type: string
           description: JSON-encoded value in the second version; absent for REMOVED.
+
+    AdminDocumentPartitionResponse:
+      type: object
+      required: [partition, sizeBytes, updatedAt]
+      properties:
+        partition:
+          type: string
+        sizeBytes:
+          type: integer
+          format: int64
+        updatedAt:
+          type: string
+          format: date-time
+
+    AdminDocumentPartitionListResponse:
+      type: object
+      required: [partitions]
+      properties:
+        partitions:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminDocumentPartitionResponse'
 
     AdminAssetResponse:
       type: object

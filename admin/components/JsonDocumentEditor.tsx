@@ -3,17 +3,20 @@
 import { useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/LocaleProvider";
+import { documentApiUrl } from "@/lib/document-api-url";
 import { formatForEditing } from "@/lib/json-format";
 import { indentSelection, outdentSelection } from "@/lib/text-indent";
 
 export function JsonDocumentEditor({
                                        extensionId,
                                        slotKey,
+                                       partition,
                                        storedContent,
                                        contentHash,
                                    }: {
     extensionId: string;
     slotKey: string;
+    partition?: string;
     storedContent: string;
     contentHash: string;
 }) {
@@ -85,7 +88,7 @@ export function JsonDocumentEditor({
 
         setIsSaving(true);
         try {
-            const response = await fetch(`/api/extensions/${extensionId}/documents/${slotKey}`, {
+            const response = await fetch(documentApiUrl(extensionId, slotKey, "", partition), {
                 method: "PUT",
                 headers: { "Content-Type": "application/json", "If-Match": `"${contentHash}"` },
                 body: JSON.stringify({ content: text }),

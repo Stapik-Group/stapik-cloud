@@ -203,5 +203,7 @@
   "assets.deleteError": "Failed to delete the file (HTTP {status}).",
   "assets.preview": "Preview",
   "assets.closePreview": "Close preview",
-  "assets.download": "Download"
+  "assets.download": "Download",
+  "documents.mainDocument": "Main document",
+  "documents.noMainDocument": "This slot has no main document yet — pick a partition."
 }
