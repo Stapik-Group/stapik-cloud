@@ -92,6 +92,12 @@ jobs:
           tar -czf "dist/stapik-cloud-admin-${VERSION}.tar.gz" -C admin/.next/standalone .
           tar -czf "dist/stapik-cloud-admin-static-${VERSION}.tar.gz" -C admin/.next static
 
+          export SDK_VERSION="${VERSION}"
+          sdk/generate.sh all
+          for sdk in kotlin cpp; do
+            (cd "sdk/${sdk}" && zip -qr "../../dist/stapik-cloud-sdk-${sdk}-${VERSION}.zip" .)
+          done
+
           cp deploy/docker-compose.yml deploy/.env.example deploy/proxmox/deploy.sh dist/
           (cd dist && sha256sum * > SHA256SUMS)
 

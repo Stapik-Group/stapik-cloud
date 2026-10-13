@@ -61,6 +61,13 @@ jobs:
           bash -n deploy/proxmox/deploy.sh
           shellcheck --severity=error deploy/proxmox/deploy.sh
 
+  sdk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate client SDKs
+        run: sdk/generate.sh all
+
   images:
     runs-on: ubuntu-latest
     needs: [backend, admin]

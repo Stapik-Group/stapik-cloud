@@ -59,7 +59,7 @@ Running the same command again updates an existing installation (checks out the 
 ## CI and releases
 
 - Pull requests into `main`/`master` run the backend tests (Testcontainers), the admin lint and build (with API types generated from the OpenAPI spec), validation of the deploy files, and a build plus Trivy scan of both Docker images. Plain pushes to branches run nothing.
-- Pushing a tag `vX.Y.Z` runs the same checks, then publishes the images `ghcr.io/<owner>/stapik-cloud-backend` and `ghcr.io/<owner>/stapik-cloud-admin` (tags `X.Y.Z` and `X.Y`) and creates a GitHub release with the backend jar, the admin build, the deploy files and `SHA256SUMS`. Tags with a suffix (`v1.3.0-rc1`) are marked as pre-releases.
+- Pushing a tag `vX.Y.Z` runs the same checks, then publishes the images `ghcr.io/<owner>/stapik-cloud-backend` and `ghcr.io/<owner>/stapik-cloud-admin` (tags `X.Y.Z` and `X.Y`) and creates a GitHub release with the backend jar, the admin build, the Kotlin and C++ client SDKs (zip), the deploy files and `SHA256SUMS`. Tags with a suffix (`v1.3.0-rc1`) are marked as pre-releases.
 - The first time, set both packages to public in the GitHub package settings, otherwise the server needs `docker login ghcr.io` to pull them.
 
 See [`deploy/README.md`](deploy/README.md) for the full walkthrough, configuration, and security notes.
@@ -72,6 +72,8 @@ Two OpenAPI specifications live under `backend/src/main/resources/openapi/`:
 - **`admin-api.yaml`** — endpoints used by the admin panel (extensions, slots, keys, audit log), authenticated with a JWT bearer token
 
 Both share a common error schema (`common/error.yaml`, RFC 7807 structured errors).
+
+Client SDKs for Kotlin and C++ are generated from `app-api.yaml` — see [`sdk/README.md`](sdk/README.md).
 
 ## Configuration
 
