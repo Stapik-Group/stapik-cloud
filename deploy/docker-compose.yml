@@ -3,6 +3,7 @@ services:
     image: postgres:16-alpine
     container_name: stapik-cloud-postgres
     restart: unless-stopped
+    mem_limit: ${POSTGRES_MEM_LIMIT:-512m}
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-stapik_cloud}
       POSTGRES_USER: ${POSTGRES_USER:-stapik}
@@ -23,6 +24,7 @@ services:
       dockerfile: Dockerfile
     container_name: stapik-cloud-app
     restart: unless-stopped
+    mem_limit: ${APP_MEM_LIMIT:-1g}
     depends_on:
       postgres:
         condition: service_healthy
@@ -61,11 +63,13 @@ services:
         openapi: ../backend/src/main/resources/openapi
     container_name: stapik-cloud-admin
     restart: unless-stopped
+    mem_limit: ${ADMIN_MEM_LIMIT:-384m}
     depends_on:
       app:
         condition: service_healthy
     environment:
       STAPIK_CLOUD_API_URL: http://app:8080
+      NODE_OPTIONS: --max-old-space-size=${ADMIN_NODE_HEAP_MB:-256}
       FORCE_HTTPS: ${FORCE_HTTPS:-false}
       COOKIE_SECURE: ${FORCE_HTTPS:-false}
     healthcheck:
