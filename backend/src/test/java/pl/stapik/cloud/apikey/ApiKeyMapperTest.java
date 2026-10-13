@@ -36,12 +36,14 @@ class ApiKeyMapperTest {
         // Given
         UUID id = UUID.randomUUID();
         Instant createdAt = Instant.parse("2026-07-18T10:00:00Z");
+        Instant expiresAt = Instant.parse("2027-07-18T10:00:00Z");
 
         ApiKeyData entity = new ApiKeyData();
         entity.setId(id);
         entity.setLabel("Test Label");
         entity.setScope(pl.stapik.cloud.apikey.data.ApiKeyScope.READ_ONLY);
         entity.setLastUsedAt(createdAt);
+        entity.setExpiresAt(expiresAt);
         entity.setCreatedAt(createdAt);
         entity.setRevoked(false);
 
@@ -54,6 +56,7 @@ class ApiKeyMapperTest {
         assertThat(response.getLabel()).isEqualTo("Test Label");
         assertThat(response.getScope()).isEqualTo(ApiKeyScope.ONLY);
         assertThat(response.getLastUsedAt()).isEqualTo(JsonNullable.of(createdAt.atOffset(ZoneOffset.UTC)));
+        assertThat(response.getExpiresAt()).isEqualTo(JsonNullable.of(expiresAt.atOffset(ZoneOffset.UTC)));
     }
 
     @Test
