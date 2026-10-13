@@ -71,6 +71,8 @@ Both share a common error schema (`common/error.yaml`, RFC 7807 structured error
 
 The backend is configured entirely through environment variables — see [`deploy/.env.example`](deploy/.env.example) for the full list (database credentials, JWT secret, admin bootstrap account, admin panel CORS origin, audit log retention).
 
+Both services send `Content-Security-Policy`, `X-Content-Type-Options` and `Referrer-Policy` headers. The app works over plain HTTP by default; set `FORCE_HTTPS=true` once it is served over HTTPS to additionally send `Strict-Transport-Security` and mark session cookies `Secure`.
+
 ## Two-factor authentication
 
 Every admin can enable TOTP on the *My account* page: scan the QR code, confirm with a code, store the backup codes. Verification is local (HMAC over the shared secret and the clock), so neither the server nor the phone needs internet access, only a reasonably accurate clock on both. The issuer shown in the authenticator app defaults to `Stapik Cloud` and can be changed with `STAPIK_CLOUD_SECURITY_TOTP_ISSUER`.

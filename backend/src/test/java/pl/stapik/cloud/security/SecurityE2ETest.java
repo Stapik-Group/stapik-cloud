@@ -70,6 +70,15 @@ class SecurityE2ETest extends AbstractIntegrationTest {
     }
 
     @Test
+    void responsesCarrySecurityHeaders() throws Exception {
+        mockMvc.perform(get("/api/v1/health").secure(true))
+                .andExpect(header().string("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'"))
+                .andExpect(header().string("X-Content-Type-Options", "nosniff"))
+                .andExpect(header().string("Referrer-Policy", "no-referrer"))
+                .andExpect(header().doesNotExist("Strict-Transport-Security"));
+    }
+
+    @Test
     void meWithoutApiKeyIsRejected() throws Exception {
         mockMvc.perform(get("/api/v1/me"))
                 .andExpect(status().isUnauthorized());

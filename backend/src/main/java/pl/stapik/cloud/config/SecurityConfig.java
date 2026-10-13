@@ -2,6 +2,7 @@ package pl.stapik.cloud.config;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -9,11 +10,13 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 import pl.stapik.cloud.admin.AdminSessionService;
 import pl.stapik.cloud.apikey.ApiKeyProperties;
@@ -28,18 +31,27 @@ import pl.stapik.cloud.security.ratelimit.ApiKeyRateLimitFilter;
 import pl.stapik.cloud.security.ratelimit.KeyedRateLimiter;
 import pl.stapik.cloud.security.ratelimit.LoginRateLimitFilter;
 import pl.stapik.cloud.security.ratelimit.RateLimitProperties;
+import pl.stapik.cloud.security.TransportSecurityProperties;
 
 import java.time.Clock;
+import java.time.Duration;
 
 @Configuration
 @EnableWebSecurity
+@EnableConfigurationProperties(TransportSecurityProperties.class)
 public class SecurityConfig {
+
+    private static final String API_CONTENT_SECURITY_POLICY = "default-src 'none'; frame-ancestors 'none'";
+    private static final String DOCS_CONTENT_SECURITY_POLICY =
+            "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'";
+    private static final Duration HSTS_MAX_AGE = Duration.ofDays(365);
 
     private final HandlerExceptionResolver exceptionResolver;
     private final ApiKeyAuthenticationFilter apiKeyAuthenticationFilter;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final ApiKeyRateLimitFilter apiKeyRateLimitFilter;
     private final LoginRateLimitFilter loginRateLimitFilter;
+    private final TransportSecurityProperties transportSecurityProperties;
 
     @Autowired
     public SecurityConfig(@Qualifier("handlerExceptionResolver") HandlerExceptionResolver exceptionResolver,
@@ -50,8 +62,10 @@ public class SecurityConfig {
                           Clock clock,
                           JwtService jwtService,
                           AdminSessionService adminSessionService,
-                          RateLimitProperties rateLimitProperties) {
+                          RateLimitProperties rateLimitProperties,
+                          TransportSecurityProperties transportSecurityProperties) {
         this.exceptionResolver = exceptionResolver;
+        this.transportSecurityProperties = transportSecurityProperties;
         this.apiKeyAuthenticationFilter = new ApiKeyAuthenticationFilter(
                 apiKeyRepository, extensionRepository, apiKeyHasher, apiKeyProperties, clock);
         this.jwtAuthenticationFilter = new JwtAuthenticationFilter(jwtService, adminSessionService);
@@ -69,6 +83,7 @@ public class SecurityConfig {
                 .securityMatcher(apiBaseAllPattern)
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .headers(headers -> applySecurityHeaders(headers, API_CONTENT_SECURITY_POLICY))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/v1/health").permitAll()
                         .requestMatchers(HttpMethod.GET, apiBaseAllPattern).authenticated()
@@ -94,6 +109,7 @@ public class SecurityConfig {
                 .securityMatcher(apiAdminAllPattern)
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .headers(headers -> applySecurityHeaders(headers, API_CONTENT_SECURITY_POLICY))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/admin/auth/login", "/api/admin/auth/login/two-factor", "/api/admin/auth/refresh", "/api/admin/auth/logout").permitAll()
                         .requestMatchers("/api/admin/account/**").authenticated()
@@ -116,8 +132,22 @@ public class SecurityConfig {
         http
                 .securityMatcher("/swagger-ui/**", "/swagger-ui.html", "/openapi/**", "/webjars/**")
                 .csrf(AbstractHttpConfigurer::disable)
+                .headers(headers -> applySecurityHeaders(headers, DOCS_CONTENT_SECURITY_POLICY))
                 .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
         return http.build();
+    }
+
+    private void applySecurityHeaders(HeadersConfigurer<HttpSecurity> headers, String contentSecurityPolicy) {
+        headers
+                .contentSecurityPolicy(csp -> csp.policyDirectives(contentSecurityPolicy))
+                .referrerPolicy(referrer -> referrer.policy(ReferrerPolicy.NO_REFERRER))
+                .httpStrictTransportSecurity(hsts -> {
+                    if (transportSecurityProperties.forceHttps()) {
+                        hsts.maxAgeInSeconds(HSTS_MAX_AGE.toSeconds()).includeSubDomains(true);
+                    } else {
+                        hsts.disable();
+                    }
+                });
     }
 
     @Bean

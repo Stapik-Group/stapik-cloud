@@ -48,6 +48,7 @@ stapik-cloud:
     allowed-origins: ${ADMIN_ALLOWED_ORIGINS:http://localhost:5173}
   security:
     api-key-header: x-api-key
+    force-https: ${FORCE_HTTPS:false}
     jwt:
       secret: ${JWT_SECRET}
       expiration-minutes: ${JWT_EXPIRATION_MINUTES:60}
