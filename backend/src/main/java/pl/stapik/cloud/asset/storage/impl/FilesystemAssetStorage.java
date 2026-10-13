@@ -6,14 +6,10 @@ import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 import pl.stapik.cloud.asset.AssetChecksumMismatchException;
-import pl.stapik.cloud.asset.AssetChunkTooLargeException;
 import pl.stapik.cloud.asset.storage.AssetStorage;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
-import java.nio.channels.Channels;
-import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -31,10 +27,14 @@ public class FilesystemAssetStorage implements AssetStorage {
     private static final String PART_FILE_SUFFIX = ".part";
     private static final int BUFFER_SIZE = 64 * 1024;
 
-    private final Path rootPath;
+    private record Fingerprint(String checksumSha256, long sizeBytes) { }
 
-    public FilesystemAssetStorage(@Value("${stapik-cloud.asset-storage.root-path}") String rootPath) {
+    private final Path rootPath;
+    private final AssetFileCipher cipher;
+
+    public FilesystemAssetStorage(@Value("${stapik-cloud.asset-storage.root-path}") String rootPath, AssetFileCipher cipher) {
         this.rootPath = Path.of(rootPath);
+        this.cipher = cipher;
     }
 
     @Override
@@ -45,8 +45,10 @@ public class FilesystemAssetStorage implements AssetStorage {
         MessageDigest digest = newSha256Digest();
 
         long sizeBytes;
-        try (DigestInputStream digestStream = new DigestInputStream(file.getInputStream(), digest)) {
-            sizeBytes = Files.copy(digestStream, targetFile, StandardCopyOption.REPLACE_EXISTING);
+        try (DigestInputStream digestStream = new DigestInputStream(file.getInputStream(), digest);
+             AssetFileCipher.Appender appender = cipher.create(
+                     targetFile, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE)) {
+            sizeBytes = appender.write(digestStream, Long.MAX_VALUE);
         }
 
         String checksum = HexFormat.of().formatHex(digest.digest());
@@ -61,7 +63,7 @@ public class FilesystemAssetStorage implements AssetStorage {
         if (!file.startsWith(rootPath) || !Files.exists(file)) {
             throw new IOException("Asset file not found: " + storagePath);
         }
-        return new FileSystemResource(file);
+        return cipher.isEncrypted(file) ? new EncryptedAssetResource(file, cipher) : new FileSystemResource(file);
     }
 
     @Override
@@ -79,18 +81,13 @@ public class FilesystemAssetStorage implements AssetStorage {
 
         Path partFile = resolvePartFile(uploadId);
         Files.createDirectories(partFile.getParent());
-        Files.createFile(partFile);
+        cipher.create(partFile, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE).close();
     }
 
     @Override
     public long appendChunk(UUID uploadId, long offset, InputStream chunk, long maxBytes) throws IOException {
-        try (FileChannel channel = FileChannel.open(resolvePartFile(uploadId), StandardOpenOption.WRITE)) {
-            if (channel.size() < offset) {
-                throw new IOException("Upload file is shorter than the committed offset: " + uploadId);
-            }
-            channel.truncate(offset);
-            channel.position(offset);
-            return copyBounded(chunk, Channels.newOutputStream(channel), maxBytes);
+        try (AssetFileCipher.Appender appender = cipher.resume(resolvePartFile(uploadId), offset)) {
+            return appender.write(chunk, maxBytes);
         }
     }
 
@@ -99,20 +96,29 @@ public class FilesystemAssetStorage implements AssetStorage {
         Path partFile = resolvePartFile(uploadId);
         Path targetFile = resolveTargetFile(extensionId, slotId, filename);
 
-        String checksum = checksumOf(partFile);
-        if (expectedChecksumSha256 != null && !expectedChecksumSha256.equalsIgnoreCase(checksum)) {
-            throw new AssetChecksumMismatchException(expectedChecksumSha256, checksum);
+        Fingerprint fingerprint = fingerprintOf(partFile);
+        if (expectedChecksumSha256 != null && !expectedChecksumSha256.equalsIgnoreCase(fingerprint.checksumSha256())) {
+            throw new AssetChecksumMismatchException(expectedChecksumSha256, fingerprint.checksumSha256());
         }
 
         Files.createDirectories(targetFile.getParent());
         Files.move(partFile, targetFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
 
-        return new StoredAsset(rootPath.relativize(targetFile).toString(), checksum, Files.size(targetFile));
+        return new StoredAsset(rootPath.relativize(targetFile).toString(), fingerprint.checksumSha256(), fingerprint.sizeBytes());
     }
 
     @Override
     public void discardUpload(UUID uploadId) throws IOException {
         Files.deleteIfExists(resolvePartFile(uploadId));
+    }
+
+    @Override
+    public void secure(String storagePath) throws IOException {
+        Path file = rootPath.resolve(storagePath).normalize();
+        if (!file.startsWith(rootPath) || !Files.exists(file)) {
+            throw new IOException("Asset file not found: " + storagePath);
+        }
+        cipher.secure(file);
     }
 
     private Path resolveTargetFile(UUID extensionId, UUID slotId, String filename) throws IOException {
@@ -128,34 +134,20 @@ public class FilesystemAssetStorage implements AssetStorage {
         return rootPath.resolve(UPLOADS_DIRECTORY).resolve(uploadId + PART_FILE_SUFFIX);
     }
 
-    private long copyBounded(InputStream source, OutputStream target, long maxBytes) throws IOException {
-        byte[] buffer = new byte[BUFFER_SIZE];
-        long copied = 0;
-        int read;
-
-        while ((read = source.read(buffer)) != -1) {
-            copied += read;
-            if (copied > maxBytes) {
-                throw new AssetChunkTooLargeException(maxBytes);
-            }
-            target.write(buffer, 0, read);
-        }
-
-        return copied;
-    }
-
-    private String checksumOf(Path file) throws IOException {
+    private Fingerprint fingerprintOf(Path encryptedFile) throws IOException {
         MessageDigest digest = newSha256Digest();
         byte[] buffer = new byte[BUFFER_SIZE];
+        long sizeBytes = 0;
         int read;
 
-        try (InputStream stream = Files.newInputStream(file)) {
+        try (InputStream stream = cipher.open(encryptedFile)) {
             while ((read = stream.read(buffer)) != -1) {
                 digest.update(buffer, 0, read);
+                sizeBytes += read;
             }
         }
 
-        return HexFormat.of().formatHex(digest.digest());
+        return new Fingerprint(HexFormat.of().formatHex(digest.digest()), sizeBytes);
     }
 
     private MessageDigest newSha256Digest() {

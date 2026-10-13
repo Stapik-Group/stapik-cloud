@@ -16,4 +16,5 @@ public interface AssetStorage {
     long appendChunk(UUID uploadId, long offset, InputStream chunk, long maxBytes) throws IOException;
     StoredAsset commitUpload(UUID uploadId, UUID extensionId, UUID slotId, String filename, String expectedChecksumSha256) throws IOException;
     void discardUpload(UUID uploadId) throws IOException;
+    void secure(String storagePath) throws IOException;
 }
