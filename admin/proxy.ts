@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AUTH_COOKIE_NAME, REFRESH_COOKIE_NAME } from "@/lib/api-client";
+import { clientHeaders } from "@/lib/client-headers";
 import {
     exchangeRefreshToken,
     isAccessTokenExpiring,
@@ -49,7 +50,7 @@ export default async function proxy(request: NextRequest) {
         return accessToken ? NextResponse.next() : redirectToLogin(request);
     }
 
-    const refreshResult = await exchangeRefreshToken(refreshToken);
+    const refreshResult = await exchangeRefreshToken(refreshToken, clientHeaders(request));
 
     if (refreshResult.status === "rejected") {
         return redirectToLogin(request);

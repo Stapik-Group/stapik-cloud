@@ -139,5 +139,15 @@
   "documents.encryptedNotice": "This document is end-to-end encrypted on the user's device. The server only sees an encrypted blob, so it cannot be edited and its versions cannot be compared.",
   "apiKeys.revokeConfirm": "Revoke this key? This cannot be undone.",
   "apiKeys.revoking": "...",
-  "apiKeys.revokeButton": "Revoke"
+  "apiKeys.revokeButton": "Revoke",
+  "account.sessionsTitle": "Active sessions",
+  "account.sessionCurrent": "this session",
+  "account.sessionUnknownAddress": "Unknown address",
+  "account.sessionUnknownDevice": "Unknown device",
+  "account.sessionLastActive": "Last active: {date}",
+  "account.sessionStarted": "signed in: {date}",
+  "account.sessionSignOut": "Sign out",
+  "account.sessionsRevokeOthers": "Sign out all other sessions",
+  "account.sessionsRevokeOthersConfirm": "Sign out all other sessions?",
+  "account.sessionsError": "Failed to sign out the session."
 }

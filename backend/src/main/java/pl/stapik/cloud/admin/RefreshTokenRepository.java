@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 import pl.stapik.cloud.admin.data.RefreshTokenData;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -16,7 +17,15 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshTokenData, 
 
     Optional<RefreshTokenData> findByTokenHash(String tokenHash);
 
+    List<RefreshTokenData> findByAdminUserIdAndUsedAtIsNullAndExpiresAtAfter(UUID adminUserId, Instant now);
+
+    boolean existsBySessionIdAndExpiresAtAfter(UUID sessionId, Instant now);
+
     void deleteByTokenHash(String tokenHash);
+
+    long deleteByAdminUserIdAndSessionId(UUID adminUserId, UUID sessionId);
+
+    long deleteByAdminUserIdAndSessionIdNot(UUID adminUserId, UUID sessionId);
 
     void deleteByAdminUserId(UUID adminUserId);
 

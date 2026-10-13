@@ -9,8 +9,10 @@ import pl.stapik.cloud.admin.RefreshTokenRepository;
 import pl.stapik.cloud.admin.data.AdminUserData;
 import pl.stapik.cloud.admin.data.RefreshTokenData;
 import pl.stapik.cloud.admin.dto.AdminSession;
+import pl.stapik.cloud.admin.dto.SessionInfo;
 import pl.stapik.cloud.audit.Auditing;
 import pl.stapik.cloud.audit.data.AuditAction;
+import pl.stapik.cloud.security.admin.ClientInfo;
 import pl.stapik.cloud.security.admin.JwtService;
 
 import java.nio.charset.StandardCharsets;
@@ -20,8 +22,15 @@ import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.Comparator;
 import java.util.HexFormat;
+import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.function.BinaryOperator;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class AdminSessionServiceImpl implements AdminSessionService {
@@ -52,15 +61,15 @@ public class AdminSessionServiceImpl implements AdminSessionService {
     @Transactional
     @Auditing(action = AuditAction.ADMIN_LOGIN_SUCCEEDED, actor = "#adminUser.username")
     @Override
-    public AdminSession startSession(AdminUserData adminUser) {
+    public AdminSession startSession(AdminUserData adminUser, ClientInfo client) {
         Instant now = Instant.now();
         deleteStaleTokens(adminUser, now);
-        return issueSession(adminUser, now);
+        return issueSession(adminUser, UUID.randomUUID(), now, client, now);
     }
 
     @Transactional
     @Override
-    public Optional<AdminSession> refreshSession(String refreshToken) {
+    public Optional<AdminSession> refreshSession(String refreshToken, ClientInfo client) {
         Instant now = Instant.now();
 
         Optional<RefreshTokenData> storedToken = refreshTokenRepository.findByTokenHash(hash(refreshToken));
@@ -75,7 +84,7 @@ public class AdminSessionServiceImpl implements AdminSessionService {
 
         return adminUserRepository.findById(currentToken.getAdminUserId()).map(adminUser -> {
             deleteStaleTokens(adminUser, now);
-            return issueSession(adminUser, now);
+            return issueSession(adminUser, currentToken.getSessionId(), currentToken.getSessionStartedAt(), client, now);
         });
     }
 
@@ -83,6 +92,54 @@ public class AdminSessionServiceImpl implements AdminSessionService {
     @Override
     public void endSession(String refreshToken) {
         refreshTokenRepository.deleteByTokenHash(hash(refreshToken));
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public boolean isActive(UUID sessionId) {
+        return refreshTokenRepository.existsBySessionIdAndExpiresAtAfter(sessionId, Instant.now());
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public List<SessionInfo> listSessions(UUID adminUserId, UUID currentSessionId) {
+        return refreshTokenRepository.findByAdminUserIdAndUsedAtIsNullAndExpiresAtAfter(adminUserId, Instant.now()).stream()
+                .collect(Collectors.toMap(
+                        RefreshTokenData::getSessionId,
+                        Function.identity(),
+                        BinaryOperator.maxBy(Comparator.comparing(RefreshTokenData::getCreatedAt))))
+                .values().stream()
+                .map(token -> toSessionInfo(token, currentSessionId))
+                .sorted(Comparator.comparing(SessionInfo::lastActiveAt).reversed())
+                .toList();
+    }
+
+    @Transactional
+    @Auditing(action = AuditAction.ADMIN_SESSION_REVOKED, details = "'Session ' + #sessionId + ' signed out'")
+    @Override
+    public void revokeSession(UUID adminUserId, UUID sessionId) {
+        if (refreshTokenRepository.deleteByAdminUserIdAndSessionId(adminUserId, sessionId) == 0) {
+            throw new NoSuchElementException("Session not found: " + sessionId);
+        }
+    }
+
+    @Transactional
+    @Auditing(action = AuditAction.ADMIN_SESSION_REVOKED, details = "'All other sessions signed out'")
+    @Override
+    public void revokeOtherSessions(UUID adminUserId, UUID currentSessionId) {
+        refreshTokenRepository.deleteByAdminUserIdAndSessionIdNot(adminUserId, currentSessionId);
+    }
+
+    private SessionInfo toSessionInfo(RefreshTokenData token, UUID currentSessionId) {
+        return new SessionInfo(
+                token.getSessionId(),
+                token.getSessionStartedAt(),
+                token.getCreatedAt(),
+                token.getExpiresAt(),
+                token.getIpAddress(),
+                token.getUserAgent(),
+                token.getSessionId().equals(currentSessionId)
+        );
     }
 
     private boolean isUsable(RefreshTokenData token, Instant now) {
@@ -95,13 +152,19 @@ public class AdminSessionServiceImpl implements AdminSessionService {
         refreshTokenRepository.deleteStaleTokens(adminUser.getId(), now, now.minus(reuseLeeway));
     }
 
-    private AdminSession issueSession(AdminUserData adminUser, Instant now) {
-        String accessToken = jwtService.generateToken(adminUser.getId(), adminUser.getUsername(), adminUser.getRole());
+    private AdminSession issueSession(AdminUserData adminUser, UUID sessionId, Instant sessionStartedAt,
+                                      ClientInfo client, Instant now) {
+        String accessToken = jwtService.generateToken(
+                adminUser.getId(), adminUser.getUsername(), adminUser.getRole(), sessionId);
         String rawRefreshToken = generateRawRefreshToken();
         Instant refreshTokenExpiresAt = now.plus(refreshTokenLifetime);
 
         refreshTokenRepository.save(RefreshTokenData.builder()
                 .adminUserId(adminUser.getId())
+                .sessionId(sessionId)
+                .sessionStartedAt(sessionStartedAt)
+                .ipAddress(client.ipAddress())
+                .userAgent(client.userAgent())
                 .tokenHash(hash(rawRefreshToken))
                 .createdAt(now)
                 .expiresAt(refreshTokenExpiresAt)

@@ -265,6 +265,43 @@ paths:
               schema:
                 $ref: 'common/error.yaml#/components/schemas/Problem'
 
+  /account/sessions:
+    get:
+      operationId: listSessions
+      tags: [account]
+      summary: Active sessions of the signed-in admin
+      responses:
+        '200':
+          description: Sessions, most recently active first
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionListResponse'
+    delete:
+      operationId: revokeOtherSessions
+      tags: [account]
+      summary: Sign out every session except the current one
+      responses:
+        '204':
+          description: Other sessions signed out
+
+  /account/sessions/{sessionId}:
+    delete:
+      operationId: revokeSession
+      tags: [account]
+      summary: Sign out a single session
+      parameters:
+        - $ref: '#/components/parameters/SessionIdParam'
+      responses:
+        '204':
+          description: Session signed out
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: 'common/error.yaml#/components/schemas/Problem'
+
   /admin-users:
     get:
       operationId: listAdminUsers
@@ -665,6 +702,13 @@ components:
       schema:
         type: string
         format: uuid
+    SessionIdParam:
+      name: sessionId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
     ExtensionIdParam:
       name: extensionId
       in: path
@@ -769,6 +813,38 @@ components:
         backupCodesRemaining:
           type: integer
           format: int64
+
+    SessionResponse:
+      type: object
+      required: [id, startedAt, lastActiveAt, expiresAt, current]
+      properties:
+        id:
+          type: string
+          format: uuid
+        startedAt:
+          type: string
+          format: date-time
+        lastActiveAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        ipAddress:
+          type: string
+        userAgent:
+          type: string
+        current:
+          type: boolean
+
+    SessionListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SessionResponse'
 
     TwoFactorSetupResponse:
       type: object

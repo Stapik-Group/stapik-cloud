@@ -1,6 +1,7 @@
 package pl.stapik.cloud.security.admin;
 
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtBuilder;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -20,6 +21,7 @@ import java.util.UUID;
 @Component
 public class JwtService {
 
+    private static final String SESSION_CLAIM = "sid";
     private static final String PURPOSE_CLAIM = "purpose";
     private static final String TWO_FACTOR_PURPOSE = "two-factor";
     private static final Duration CHALLENGE_LIFETIME = Duration.ofMinutes(5);
@@ -39,16 +41,22 @@ public class JwtService {
     }
 
     public String generateToken(UUID adminUserId, String username, String role) {
+        return generateToken(adminUserId, username, role, null);
+    }
+
+    public String generateToken(UUID adminUserId, String username, String role, UUID sessionId) {
         Instant now = Instant.now();
-        return Jwts.builder()
+        JwtBuilder builder = Jwts.builder()
                 .subject(username)
                 .id(adminUserId.toString())
                 .claim("role", role)
                 .issuer(issuer)
                 .issuedAt(Date.from(now))
-                .expiration(Date.from(now.plus(expirationMinutes, ChronoUnit.MINUTES)))
-                .signWith(signingKey)
-                .compact();
+                .expiration(Date.from(now.plus(expirationMinutes, ChronoUnit.MINUTES)));
+        if (sessionId != null) {
+            builder.claim(SESSION_CLAIM, sessionId.toString());
+        }
+        return builder.signWith(signingKey).compact();
     }
 
     public TwoFactorChallenge generateTwoFactorChallenge(UUID adminUserId, String username) {
@@ -89,10 +97,12 @@ public class JwtService {
             if (claims.get(PURPOSE_CLAIM) != null) {
                 return Optional.empty();
             }
+            String sessionId = claims.get(SESSION_CLAIM, String.class);
             return Optional.of(new JwtPrincipal(
                     UUID.fromString(claims.getId()),
                     claims.getSubject(),
-                    claims.get("role", String.class)
+                    claims.get("role", String.class),
+                    sessionId == null ? null : UUID.fromString(sessionId)
             ));
         } catch (JwtException | IllegalArgumentException e) {
             log.warn("JWT validation failed", e);

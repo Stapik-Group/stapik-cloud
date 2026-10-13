@@ -139,5 +139,15 @@
   "documents.encryptedNotice": "Ten dokument jest zaszyfrowany end-to-end na urządzeniu użytkownika. Serwer widzi tylko zaszyfrowany blob, więc nie można go edytować ani porównywać wersji.",
   "apiKeys.revokeConfirm": "Odwołać ten klucz? Tego nie da się cofnąć.",
   "apiKeys.revoking": "...",
-  "apiKeys.revokeButton": "Odwołaj"
+  "apiKeys.revokeButton": "Odwołaj",
+  "account.sessionsTitle": "Aktywne sesje",
+  "account.sessionCurrent": "ta sesja",
+  "account.sessionUnknownAddress": "Nieznany adres",
+  "account.sessionUnknownDevice": "Nieznane urządzenie",
+  "account.sessionLastActive": "Ostatnia aktywność: {date}",
+  "account.sessionStarted": "zalogowano: {date}",
+  "account.sessionSignOut": "Wyloguj",
+  "account.sessionsRevokeOthers": "Wyloguj wszystkie pozostałe sesje",
+  "account.sessionsRevokeOthersConfirm": "Wylogować wszystkie pozostałe sesje?",
+  "account.sessionsError": "Nie udało się wylogować sesji."
 }

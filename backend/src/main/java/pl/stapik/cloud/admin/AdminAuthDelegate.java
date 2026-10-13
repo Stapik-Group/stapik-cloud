@@ -14,6 +14,7 @@ import pl.stapik.cloud.admin.data.RefreshTokenRequest;
 import pl.stapik.cloud.admin.data.TwoFactorLoginRequest;
 import pl.stapik.cloud.admin.dto.AdminSession;
 import pl.stapik.cloud.admin.dto.Credentials;
+import pl.stapik.cloud.security.admin.CurrentClient;
 import pl.stapik.cloud.security.admin.JwtService;
 import pl.stapik.cloud.security.admin.TwoFactorChallenge;
 import pl.stapik.cloud.security.ratelimit.LoginAttemptTracker;
@@ -29,6 +30,7 @@ public class AdminAuthDelegate implements AuthApiDelegate {
     private final AdminTwoFactorService adminTwoFactorService;
     private final LoginAttemptTracker loginAttemptTracker;
     private final JwtService jwtService;
+    private final CurrentClient currentClient;
 
     @Override
     public ResponseEntity<LoginResult> login(LoginRequest loginRequest) {
@@ -41,7 +43,7 @@ public class AdminAuthDelegate implements AuthApiDelegate {
         loginAttemptTracker.reset(adminUser.getUsername());
         return ResponseEntity.ok(new LoginResult()
                 .twoFactorRequired(false)
-                .session(toLoginResponse(adminSessionService.startSession(adminUser))));
+                .session(toLoginResponse(adminSessionService.startSession(adminUser, currentClient.describe()))));
     }
 
     @Override
@@ -58,12 +60,12 @@ public class AdminAuthDelegate implements AuthApiDelegate {
         }
 
         loginAttemptTracker.reset(username);
-        return ResponseEntity.ok(toLoginResponse(adminSessionService.startSession(adminUser)));
+        return ResponseEntity.ok(toLoginResponse(adminSessionService.startSession(adminUser, currentClient.describe())));
     }
 
     @Override
     public ResponseEntity<LoginResponse> refreshToken(RefreshTokenRequest refreshTokenRequest) {
-        AdminSession session = adminSessionService.refreshSession(refreshTokenRequest.getRefreshToken())
+        AdminSession session = adminSessionService.refreshSession(refreshTokenRequest.getRefreshToken(), currentClient.describe())
                 .orElseThrow(() -> new BadCredentialsException("Invalid refresh token"));
         return ResponseEntity.ok(toLoginResponse(session));
     }

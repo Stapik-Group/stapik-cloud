@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { API_BASE_URL, CHALLENGE_COOKIE_NAME } from "@/lib/api-client";
+import { clientHeaders } from "@/lib/client-headers";
 import { setSessionCookies, type LoginTokens } from "@/lib/auth-session";
 
 export async function POST(request: NextRequest) {
@@ -14,7 +15,7 @@ export async function POST(request: NextRequest) {
 
     const backendResponse = await fetch(`${API_BASE_URL}/api/admin/auth/login/two-factor`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...clientHeaders(request) },
         body: JSON.stringify({ challengeToken, code }),
     });
 

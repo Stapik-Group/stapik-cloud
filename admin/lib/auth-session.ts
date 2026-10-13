@@ -44,11 +44,14 @@ export function isAccessTokenExpiring(accessToken: string): boolean {
     }
 }
 
-export async function exchangeRefreshToken(refreshToken: string): Promise<RefreshResult> {
+export async function exchangeRefreshToken(
+    refreshToken: string,
+    clientHeaders: Record<string, string> = {},
+): Promise<RefreshResult> {
     try {
         const response = await fetch(`${API_BASE_URL}/api/admin/auth/refresh`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", ...clientHeaders },
             body: JSON.stringify({ refreshToken }),
         });
 

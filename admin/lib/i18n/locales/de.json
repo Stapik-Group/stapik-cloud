@@ -139,5 +139,15 @@
   "documents.encryptedNotice": "Dieses Dokument wird auf dem Gerät des Nutzers Ende-zu-Ende verschlüsselt. Der Server sieht nur einen verschlüsselten Blob, daher kann es weder bearbeitet noch können seine Versionen verglichen werden.",
   "apiKeys.revokeConfirm": "Diesen Schlüssel widerrufen? Dies kann nicht rückgängig gemacht werden.",
   "apiKeys.revoking": "...",
-  "apiKeys.revokeButton": "Widerrufen"
+  "apiKeys.revokeButton": "Widerrufen",
+  "account.sessionsTitle": "Aktive Sitzungen",
+  "account.sessionCurrent": "diese Sitzung",
+  "account.sessionUnknownAddress": "Unbekannte Adresse",
+  "account.sessionUnknownDevice": "Unbekanntes Gerät",
+  "account.sessionLastActive": "Zuletzt aktiv: {date}",
+  "account.sessionStarted": "angemeldet: {date}",
+  "account.sessionSignOut": "Abmelden",
+  "account.sessionsRevokeOthers": "Alle anderen Sitzungen abmelden",
+  "account.sessionsRevokeOthersConfirm": "Alle anderen Sitzungen abmelden?",
+  "account.sessionsError": "Die Sitzung konnte nicht abgemeldet werden."
 }
